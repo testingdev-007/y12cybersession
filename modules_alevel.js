@@ -396,7 +396,7 @@ MODULES.sqlInjection = {
       },
       {
         name:'/api/v2/products', purpose:'GET — product listing with ID filter',
-        endpoint:'/api/v2/products', inputField:'id', submittedValue:"1 UNION SELECT username, password_hash, email FROM users --",
+        endpoint:'/api/v2/products', inputField:'id', submittedValue:"1 UNION SELECT username, pwd_hash FROM users --",
         responseCode:'200 OK', rate:'3 reqs',
         ragAnswer:'R', actionAnswer:'block',
         notes:"UNION-based data exfiltration: the UNION SELECT appends a second query, returning rows from the users table alongside the product results. The attacker is enumerating password hashes and emails. Block source IP and rotate database credentials immediately."
@@ -547,69 +547,69 @@ MODULES.firewallReview = {
     const pool = [
       // RED — reject immediately
       {
-        name:'CR-2025-0041', purpose:'Allow ALL inbound TCP port 22 (SSH) from internet',
+        name:'CR-2025-0041', purpose:'Allow ALL inbound TCP port 22 (SSH) from internet', service:'SSH (port 22)', source:'0.0.0.0/0 — any internet IP',
         protocol:'TCP', port:'22', direction:'Inbound', requestedBy:'Dev Team', justification:'Remote server management',
         ragAnswer:'R', actionAnswer:'reject',
         notes:'Exposing SSH (port 22) to 0.0.0.0/0 (the entire internet) creates an enormous attack surface for brute-force and credential stuffing attacks. Reject. Proper practice: restrict SSH access to specific known admin IP ranges, or require VPN access first.'
       },
       {
-        name:'CR-2025-0044', purpose:'Allow inbound TCP port 3389 (RDP) from 0.0.0.0/0',
+        name:'CR-2025-0044', purpose:'Allow inbound TCP port 3389 (RDP) from 0.0.0.0/0', service:'RDP (port 3389)', source:'0.0.0.0/0 — any internet IP',
         protocol:'TCP', port:'3389', direction:'Inbound', requestedBy:'IT Support', justification:'Remote desktop access for support',
         ragAnswer:'R', actionAnswer:'reject',
         notes:'RDP exposed to the internet is one of the most commonly exploited configurations — used in ransomware attacks including WannaCry and NotPetya. Reject. Require VPN + MFA before any internal RDP is accessible, never expose port 3389 directly.'
       },
       {
-        name:'CR-2025-0047', purpose:'Allow outbound TCP port 23 (Telnet) to any destination',
+        name:'CR-2025-0047', purpose:'Allow outbound TCP port 23 (Telnet) to any destination', service:'Telnet (port 23)', source:'Any destination',
         protocol:'TCP', port:'23', direction:'Outbound', requestedBy:'Legacy Systems Team', justification:'Connection to legacy router management',
         ragAnswer:'R', actionAnswer:'reject',
         notes:'Telnet transmits all data — including credentials — in plaintext. It was superseded by SSH in 1995. Reject and require migration to SSH for all remote management. This is not a timing issue; Telnet should never be used.'
       },
       {
-        name:'CR-2025-0053', purpose:'Allow outbound TCP 0–65535 (all ports) from Finance workstations',
+        name:'CR-2025-0053', purpose:'Allow outbound TCP 0–65535 (all ports) from Finance workstations', service:'All ports (0–65535)', source:'Finance workstations',
         protocol:'TCP', port:'0–65535', direction:'Outbound', requestedBy:'Finance Manager', justification:'Application accessing various cloud services',
         ragAnswer:'R', actionAnswer:'reject',
         notes:'Permitting all outbound ports from Finance workstations would allow malware on those machines to contact any C2 server on any port — and would permit data exfiltration on non-standard ports. Reject. Request a specific list of destination services and open only those ports.'
       },
       // AMBER — escalate for further review
       {
-        name:'CR-2025-0038', purpose:'Allow inbound HTTPS (443) from subnet 192.168.50.0/24 to app server',
+        name:'CR-2025-0038', purpose:'Allow inbound HTTPS (443) from subnet 192.168.50.0/24 to app server', service:'HTTPS (port 443)', source:'192.168.50.0/24 (internal)',
         protocol:'TCP', port:'443', direction:'Inbound', requestedBy:'App Team', justification:'Internal app team testing new microservice',
         ragAnswer:'A', actionAnswer:'escalate',
         notes:'HTTPS on port 443 to a specific internal subnet is lower risk than internet-facing, but the justification lacks specifics: which app server? What microservice? When does this expire? Escalate to confirm the source subnet, destination, and add an expiry date. Not automatically safe without these details.'
       },
       {
-        name:'CR-2025-0049', purpose:'Allow outbound TCP 8080 from developer workstations to any',
+        name:'CR-2025-0049', purpose:'Allow outbound TCP 8080 from developer workstations to any', service:'HTTP alt (port 8080)', source:'Developer workstations',
         protocol:'TCP', port:'8080', direction:'Outbound', requestedBy:'Development Lead', justification:'Developer tools and API testing',
         ragAnswer:'A', actionAnswer:'escalate',
         notes:'Port 8080 is a common alternative HTTP port used by development tools. The destination ("any") is too broad — this could be scoped to specific development environments. Escalate to determine if destination can be restricted. Not an immediate reject, but needs tightening.'
       },
       {
-        name:'CR-2025-0055', purpose:'Allow inbound TCP 5900 (VNC) from 10.20.0.0/16 to server farm',
+        name:'CR-2025-0055', purpose:'Allow inbound TCP 5900 (VNC) from 10.20.0.0/16 to server farm', service:'VNC (port 5900)', source:'10.20.0.0/16 (65,536 IPs)',
         protocol:'TCP', port:'5900', direction:'Inbound', requestedBy:'Systems Administrator', justification:'Remote server console access from management VLAN',
         ragAnswer:'A', actionAnswer:'escalate',
         notes:'VNC on port 5900 from a /16 internal subnet (/16 = 65,536 addresses). The management VLAN access is plausible, but the scope is too wide. Escalate: can this be restricted to specific admin host IPs? VNC access to servers should require strong authentication.'
       },
       // GREEN — approve
       {
-        name:'CR-2025-0033', purpose:'Allow inbound HTTPS (443) to web server in DMZ from internet',
+        name:'CR-2025-0033', purpose:'Allow inbound HTTPS (443) to web server in DMZ from internet', service:'HTTPS (port 443)', source:'Internet → DMZ web server',
         protocol:'TCP', port:'443', direction:'Inbound', requestedBy:'Web Team', justification:'Public-facing web application requires HTTPS access',
         ragAnswer:'G', actionAnswer:'approve',
         notes:'Standard configuration for a public web server in the DMZ. HTTPS on port 443 is the expected protocol. Web servers in the DMZ are designed to accept inbound internet connections — this is the intended network architecture. Approve.'
       },
       {
-        name:'CR-2025-0036', purpose:'Allow outbound HTTPS (443) from internal hosts to Microsoft Update servers',
+        name:'CR-2025-0036', purpose:'Allow outbound HTTPS (443) from internal hosts to Microsoft Update servers', service:'HTTPS (port 443)', source:'Internal → Microsoft CDN',
         protocol:'TCP', port:'443', direction:'Outbound', requestedBy:'IT Infrastructure', justification:'Windows Update and Microsoft 365 traffic',
         ragAnswer:'G', actionAnswer:'approve',
         notes:'Outbound HTTPS to Microsoft Update CDN addresses is standard and required for patch management. Well-documented, specific destination, legitimate business justification. Approve.'
       },
       {
-        name:'CR-2025-0039', purpose:'Allow outbound UDP 53 (DNS) to company DNS servers only',
+        name:'CR-2025-0039', purpose:'Allow outbound UDP 53 (DNS) to company DNS servers only', service:'DNS (port 53)', source:'Internal → managed resolvers',
         protocol:'UDP', port:'53', direction:'Outbound', requestedBy:'Network Team', justification:'DNS queries from internal hosts to managed resolvers',
         ragAnswer:'G', actionAnswer:'approve',
         notes:'Restricting DNS queries to company-managed resolvers (rather than allowing DNS to any external server) is a security best practice — it prevents DNS tunnelling to arbitrary external servers. Tightly scoped and justified. Approve.'
       },
       {
-        name:'CR-2025-0042', purpose:'Allow inbound SMTP (25) to mail relay in DMZ from internet',
+        name:'CR-2025-0042', purpose:'Allow inbound SMTP (25) to mail relay in DMZ from internet', service:'SMTP (port 25)', source:'Internet → DMZ mail relay',
         protocol:'TCP', port:'25', direction:'Inbound', requestedBy:'Email Infrastructure', justification:'Inbound email delivery from external mail servers',
         ragAnswer:'G', actionAnswer:'approve',
         notes:'A mail relay in the DMZ accepting inbound SMTP on port 25 from the internet is standard email infrastructure. The relay should be isolated in the DMZ and forward only to the internal mail server. This is expected and correctly scoped. Approve.'
@@ -705,7 +705,7 @@ MODULES.legalCompliance = {
         notes:'Installing a keylogger without authority constitutes an unauthorised act intended to impair another\'s computer and intercept data — CMA S3 (max 10 years). Report to police. This is not merely a policy issue; it is a criminal offence regardless of whether the perpetrator is an employee.'
       },
       {
-        name:'INC-2025-0019', purpose:'Former employee remotely accessed company systems post-termination',
+        name:'INC-2025-0019', purpose:'Ex-staff remote access after termination',
         incident:'Ex-employee used retained credentials to access the CRM database after employment ended', legislation:'Computer Misuse Act 1990', section:'Section 1',
         ragAnswer:'R', actionAnswer:'reportPolice',
         notes:'Accessing a computer system without authorisation — credentials were no longer valid post-termination — is CMA S1 (max 2 years). If the purpose was to extract data for a competitor, it may be S2 (max 5 years). Report to police and preserve evidence. Revoke all remaining access immediately.'
@@ -717,51 +717,51 @@ MODULES.legalCompliance = {
         notes:'Deploying ransomware — intentionally modifying computer material without authority to impair its operation — is CMA S3 (max 10 years). This is the most serious category under the CMA. Report to police immediately and engage incident response. Do not pay the ransom.'
       },
       {
-        name:'INC-2025-0031', purpose:'Developer accessed production database without authorisation "to investigate a bug"',
+        name:'INC-2025-0031', purpose:'Dev accessed production DB without auth',
         incident:'Developer bypassed access controls and queried the live customer database without approval, claiming they were investigating a performance issue', legislation:'Computer Misuse Act 1990', section:'Section 1',
         ragAnswer:'R', actionAnswer:'reportPolice',
         notes:'Intent does not negate culpability under CMA S1 — the developer accessed a computer system without authorisation. R v Gold & Schifreen (1988) and subsequent CMA cases confirm that "investigating" or "testing" without authority is still unauthorised access. Report to police.'
       },
       {
-        name:'INC-2025-0035', purpose:'Employee intercepted manager\'s emails using network monitoring tool',
+        name:'INC-2025-0035', purpose:'Staff intercepted manager\'s emails via network tap',
         incident:'Staff member configured a network tap on the manager\'s VLAN segment to capture their email communications', legislation:'Regulation of Investigatory Powers Act 2000', section:'Section 1',
         ragAnswer:'R', actionAnswer:'reportPolice',
         notes:'Unlawful interception of communications — capturing email content in transit — is an offence under RIPA 2000 S1 regardless of the network owner\'s identity. The employee had no lawful authority for interception. Report to police..'
       },
       // AMBER — regulatory breaches, report to ICO / legal
       {
-        name:'INC-2025-0008', purpose:'Customer mailing list sold to marketing company without consent',
+        name:'INC-2025-0008', purpose:'Customer data sold without consent',
         incident:'Marketing manager sold a database of 45,000 customer email addresses to a third-party marketing firm without customer consent', legislation:'Data Protection Act 1998', section:'Principles 1 & 2',
         ragAnswer:'A', actionAnswer:'reportICO',
         notes:'Under DPA 1998, personal data must be processed fairly and lawfully (Principle 1) and only for specified purposes (Principle 2). Selling customer data without consent violates both. Report to the ICO. Customers must be notified. The ICO can issue enforcement notices and, under DPA 1998, fines up to £500,000.'
       },
       {
-        name:'INC-2025-0011', purpose:'HR accidentally emailed payroll spreadsheet to all staff',
+        name:'INC-2025-0011', purpose:'Payroll data sent to all staff in error',
         incident:'HR administrator sent an email containing all employees\' salaries and NI numbers to the entire company distribution list', legislation:'Data Protection Act 1998', section:'Principle 7',
         ragAnswer:'A', actionAnswer:'reportICO',
         notes:'Accidental disclosure of personal data (salary, NI numbers — "sensitive" under DPA 1998) breaches Principle 7: appropriate security measures must be in place. The ICO must be notified of significant accidental breaches. Affected individuals should be informed. Internal disciplinary action is also appropriate.'
       },
       {
-        name:'INC-2025-0026', purpose:'Customer records retained 12 years after contract end',
+        name:'INC-2025-0026', purpose:'Customer data kept 12 years past contract end',
         incident:'Audit discovered that customer personal data has been retained in the CRM system for 12 years after customers cancelled their accounts — no deletion policy exists', legislation:'Data Protection Act 1998', section:'Principle 5',
         ragAnswer:'A', actionAnswer:'reportICO',
         notes:'DPA 1998 Principle 5: personal data shall not be kept longer than is necessary for the specified purpose. Retaining inactive customer data for 12 years without justification is a clear breach. Report to ICO and implement a data retention and deletion policy immediately.'
       },
       // GREEN — internal policy violations (no criminal/regulatory breach)
       {
-        name:'INC-2025-0003', purpose:'Employee installed unlicensed software on their work laptop',
+        name:'INC-2025-0003', purpose:'Unlicensed software installed on work device',
         incident:'IT audit found that an employee had installed unlicensed copies of design software on their company-issued laptop', legislation:'Copyright Designs & Patents Act 1988', section:'CDPA (internal)',
         ragAnswer:'G', actionAnswer:'internal',
         notes:'Installing unlicensed software violates CDPA 1988 and company IT policy, but this is primarily a licensing/policy issue handled internally. Remove unlicensed software, issue formal warning, purchase appropriate licences. Not a criminal referral in the first instance unless wilful large-scale piracy is involved.'
       },
       {
-        name:'INC-2025-0007', purpose:'Junior analyst accessed their own employee record in the HR system',
+        name:'INC-2025-0007', purpose:'Analyst accessed own HR record',
         incident:'Junior analyst queried the HR database to view their own salary record and leave balance — access they are not supposed to have but the data was their own', legislation:'Not a breach', section:'Policy only',
         ragAnswer:'G', actionAnswer:'internal',
         notes:'Accessing your own data is not an offence under the CMA (no intent to harm, own data) or DPA (subject access rights exist). The analyst exceeded their system authorisation but the action caused no harm. Address the access control gap and issue a reminder of acceptable use policy. Internal matter only.'
       },
       {
-        name:'INC-2025-0016', purpose:'Graduate trainee tested SQL injection on company\'s own test server',
+        name:'INC-2025-0016', purpose:'Trainee SQL test on own dev server',
         incident:'Graduate trainee ran SQL injection payloads against the company\'s own development/test environment as a self-directed learning exercise, with no data exfiltration or damage', legislation:'Internal assessment required', section:'Context-dependent',
         ragAnswer:'G', actionAnswer:'internal',
         notes:'Testing on a company-owned test environment the trainee was authorised to use does not constitute unauthorised access (CMA S1 requires no authorisation). No data was at risk. However, this should have been approved in advance. Agree a responsible disclosure / learning process. Internal matter — no criminal referral.'
@@ -940,75 +940,75 @@ MODULES.socialEngineering = {
       // RED — clear social engineering attacks
       {
         name:'SE-001', purpose:'Phone call to IT help desk claiming urgent account issue',
-        channel:'Phone', claimedIdentity:'Senior manager (David Hargreaves)', request:'Caller asks IT to reset their password and temporarily disable MFA — says they are locked out before an important board meeting',
+        channel:'Phone', claimedIdentity:'IT caller — claims senior manager', asks:'Password reset + MFA disabled', redflag:'Urgency, MFA bypass, voice-only', request:'Caller asks IT to reset password and disable MFA — claims locked out before board meeting',
         ragAnswer:'R', actionAnswer:'block',
         notes:'Classic vishing attack. Legitimate users reset passwords through self-service portals with identity verification. Requests to disable MFA over the phone are never legitimate. The claimed urgency (board meeting) is a pressure tactic. Block and report.'
       },
       {
         name:'SE-002', purpose:'Email asking for emergency bank transfer',
-        channel:'Email', claimedIdentity:'CEO (sent from ceo-company.net — not company.com)', request:'Asks Finance to transfer £18,500 to a new supplier account "urgently and confidentially before the board sees it"',
+        channel:'Email', claimedIdentity:'CEO (lookalike domain: ceo-company.net)', asks:'Transfer £18,500 to new supplier urgently', redflag:'Lookalike domain, secrecy, urgency', request:'Asks Finance to transfer £18,500 — urgently and confidentially, before the board sees it',
         ragAnswer:'R', actionAnswer:'block',
         notes:'Business Email Compromise (CEO fraud). The domain is a lookalike — ceo-company.net vs company.com. The combination of financial request, urgency and secrecy ("before the board sees it") are the classic BEC triad. Verify all bank transfer requests by calling the requestor directly on a known number.'
       },
       {
         name:'SE-003', purpose:'Spear-phishing email referencing real internal project',
-        channel:'Email', claimedIdentity:'IT Security (it-security@company-support.co.uk)', request:'References the ongoing "Project Meridian" migration by name, asks recipient to click a link and re-authenticate to the new SharePoint environment',
+        channel:'Email', claimedIdentity:'IT Security (company-support.co.uk)', asks:'Click link to re-authenticate to SharePoint', redflag:'External domain, project name used as lure', request:'References Project Meridian by name, requests re-authentication via link to new SharePoint',
         ragAnswer:'R', actionAnswer:'block',
         notes:'Spear-phishing: the attacker has researched the company and used a real project name to build credibility. The sender domain (company-support.co.uk) is not the company\'s actual domain. The link leads to a credential-harvesting page. The personalisation is the attack — it makes it feel legitimate.'
       },
       {
         name:'SE-004', purpose:'USB drive left in company car park',
-        channel:'Physical', claimedIdentity:'Unknown — labelled "Staff Salary Review Q4 2025"', request:'Multiple drives found in car park. One employee plugged one in to find out whose it was.',
+        channel:'Physical', claimedIdentity:'Unknown (labelled Salary Review USB)', asks:'(None — employee plugged it in)', redflag:'Physical media, curiosity/self-interest lure', request:'Multiple drives found in car park. Employee plugged one in to identify the owner.',
         ragAnswer:'R', actionAnswer:'block',
         notes:'Baiting attack: the label exploits curiosity and self-interest. Once plugged in, the drive executes a payload automatically or prompts the user to enable macros. Isolate the affected workstation immediately. Never plug unknown media into a work device — the "I just wanted to return it" instinct is the attack vector.'
       },
       {
         name:'SE-005', purpose:'Contractor requesting server room access without prior arrangement',
-        channel:'Physical', claimedIdentity:'Engineer from "Halon Systems Ltd" (fire suppression)', request:'Arrives at reception unannounced, says they need 30-minute access to the server room for an annual safety inspection, shows a business card',
+        channel:'Physical', claimedIdentity:'Halon Systems Ltd contractor (unbooked)', asks:'Server room access for fire inspection', redflag:'No appointment, unescorted, unverified', request:'Unannounced arrival, requests server room access for fire safety inspection, shows business card',
         ragAnswer:'R', actionAnswer:'block',
         notes:'Pretexting with physical tailgating attempt. The scenario creates a plausible cover (fire safety) but no appointment exists and no company badge verification is possible. Legitimate contractors are always pre-booked, escorted and signed in. Deny access, ask them to rebook through Facilities.'
       },
       {
         name:'SE-006', purpose:'LinkedIn message requesting internal technical details',
-        channel:'Social Media', claimedIdentity:'Recruiter at competitor firm (profile created 2 weeks ago)', request:'Asks about "technical pain points" with the company\'s current infrastructure and offers a referral bonus for information',
+        channel:'Social Media', claimedIdentity:'Competitor recruiter (profile: 2 weeks old)', asks:'Share infrastructure technical details', redflag:'New account, unsolicited, intel gathering', request:'Asks about technical pain points with current infrastructure, offers referral bonus for information',
         ragAnswer:'R', actionAnswer:'block',
         notes:'Competitive intelligence gathering / corporate espionage. The new account, unsolicited contact and requests for internal technical detail are the indicators. This is social engineering even without a technical payload — sharing internal infrastructure details aids targeted attacks.'
       },
       // AMBER — suspicious, verify before proceeding
       {
         name:'SE-007', purpose:'Email from "Microsoft" about Azure account suspension',
-        channel:'Email', claimedIdentity:'Microsoft Azure Support (azure-alerts@microsoft-cloud-support.com)', request:'States the company\'s Azure subscription will be suspended in 48 hours due to billing issue, requests login to update payment details',
+        channel:'Email', claimedIdentity:'Microsoft Azure (microsoft-cloud-support.com)', asks:'Login via link to update billing details', redflag:'Suspicious domain — not microsoft.com', request:'Azure subscription suspended in 48h due to billing issue — requests login to update payment',
         ragAnswer:'A', actionAnswer:'verify',
         notes:'The sender domain is suspicious (microsoft-cloud-support.com, not microsoft.com) but the message content is plausible. The company does use Azure. Verify directly by logging into portal.azure.com — never via the link in this email. Could be phishing or could be a legitimate notification routed through a third-party billing service.'
       },
       {
         name:'SE-008', purpose:'Help desk ticket asking to whitelist a new software tool',
-        channel:'Internal ticketing system', claimedIdentity:'Development team lead', request:'Submitted via official ticketing system, asks IT to whitelist a new open-source dependency analysis tool for the dev team\'s use',
+        channel:'Internal ticketing system', claimedIdentity:'Development team lead (ticketing system)', asks:'Whitelist new open-source analysis tool', redflag:'Verify: external tool needs security review', request:'Via official ticketing system: whitelist a new open-source dependency analysis tool',
         ragAnswer:'A', actionAnswer:'verify',
         notes:'Submitted through the correct channel (internal ticketing), which reduces risk. However, whitelisting external tools creates a potential supply chain risk. Verify the request is genuine with the development manager, and check whether the tool has been security-reviewed. Not a clear attack but verification is warranted.'
       },
       {
         name:'SE-009', purpose:'SMS claiming to be from company IT about an urgent system alert',
-        channel:'SMS', claimedIdentity:'IT Support (unknown number)', request:'Text says: "URGENT: Your work account has been compromised. Reply YES to freeze it immediately or call this number: 0800 XXX XXXX"',
+        channel:'SMS', claimedIdentity:'IT Support (unknown SMS number)', asks:'Reply YES or call to freeze account', redflag:'SMS channel, unknown number, urgency', request:'URGENT: Your work account has been compromised. Reply YES to freeze it or call 0800 XXX XXXX',
         ragAnswer:'A', actionAnswer:'verify',
         notes:'Smishing (SMS phishing). Company IT does not send account alerts via personal SMS or use freephone numbers for security issues. However, an actual breach notification would also be unusual. Do not reply or call the number — contact IT support through the official internal number instead.'
       },
       // GREEN — legitimate, no action needed
       {
         name:'SE-010', purpose:'Password reset email from company IT portal',
-        channel:'Email', claimedIdentity:'IT Help Desk (helpdesk@company.com)', request:'Standard "Your password will expire in 7 days" notification with a link to the internal self-service portal (intranet.company.com/password)',
+        channel:'Email', claimedIdentity:'IT Help Desk (helpdesk@company.com)', asks:'Reset via internal portal (intranet link)', redflag:'None — company domain, internal portal', request:'Standard password expiry notification linking to internal self-service portal (intranet.company.com)',
         ragAnswer:'G', actionAnswer:'allow',
         notes:'Legitimate: correct internal domain, links to the company intranet (not an external site), standard process, no urgency or unusual request. Password expiry notifications from the internal domain with internal portal links are expected. No social engineering indicators.'
       },
       {
         name:'SE-011', purpose:'Procurement: new supplier onboarding form',
-        channel:'Email via official procurement system', claimedIdentity:'Procurement team (procurement@company.com)', request:'Automated notification from the procurement system asking the supplier to complete standard due diligence forms via the company\'s supplier portal',
+        channel:'Email via official procurement system', claimedIdentity:'Procurement (procurement@company.com)', asks:'Complete supplier due diligence forms', redflag:'None — official system, reference number', request:'Automated procurement system notification: complete standard supplier due diligence forms',
         ragAnswer:'G', actionAnswer:'allow',
         notes:'Legitimate business process. Sent from the correct internal domain via the official procurement system with a reference number. No requests for credentials or out-of-process payments. This is normal supplier onboarding.'
       },
       {
         name:'SE-012', purpose:'Fire safety inspection — pre-booked visit',
-        channel:'Email confirmation + Reception log', claimedIdentity:'Facilities Management', request:'Pre-booked annual fire system inspection, confirmed via email three weeks ago, contractor checked in at reception with photo ID, escorted by Facilities team',
+        channel:'Email confirmation + Reception log', claimedIdentity:'Facilities Management + verified contractor', asks:'Annual fire system inspection access', redflag:'None — pre-booked, ID verified, escorted', request:'Pre-booked annual fire inspection, confirmed 3 weeks ago, contractor verified with photo ID and escorted',
         ragAnswer:'G', actionAnswer:'allow',
         notes:'Legitimate: appointment pre-booked in advance, contractor verified with photo ID, escorted throughout. This is precisely the process that SE-005 (the pretexting attack) was trying to bypass. The contrast is the point — process compliance is the defence.'
       },
@@ -1095,75 +1095,75 @@ MODULES.malwareAnalysis = {
       // RED — confirmed malware behaviour
       {
         name:'svchost_fake.exe', purpose:'Masquerading as Windows system process',
-        path:'C:\\Users\\jsmith\\AppData\\Temp\\svchost_fake.exe', behaviour:'Reading all .docx and .xlsx files, writing encrypted copies, high disk I/O (8,000 file writes/min)', connections:'Outbound to 91.108.4.201:443 (not a Microsoft IP)',
+        path:'C:\\Users\\jsmith\\AppData\\Temp\\svchost_fake.exe', location:'AppData\\Temp\\ ⚠', activity:'8,000 writes/min, .encrypted extension', connections:'→ 91.108.4.201:443 (non-Microsoft IP)',
         ragAnswer:'R', actionAnswer:'isolate',
         notes:'Ransomware. Legitimate svchost.exe runs only from C:\\Windows\\System32 — a copy in AppData\\Temp is an immediate red flag (process name spoofing). The high file write rate with new extensions and outbound connection to an external IP (likely C2 server receiving the encryption key) are definitive. Isolate immediately.'
       },
       {
         name:'keylog32.exe', purpose:'Hidden process with keyboard and clipboard access',
-        path:'C:\\ProgramData\\WindowsHelper\\keylog32.exe', behaviour:'Hooking keyboard input API (SetWindowsHookEx), reading clipboard contents every 60s, writing to hidden log file', connections:'Outbound to 45.92.14.99:80 every 3 minutes',
+        path:'C:\\ProgramData\\WindowsHelper\\keylog32.exe', location:'ProgramData (non-standard dir)', activity:'Keyboard API hook + clipboard capture', connections:'→ 45.92.14.99:80 (3-min C2 interval)',
         ragAnswer:'R', actionAnswer:'isolate',
         notes:'Keylogger. SetWindowsHookEx is the Windows API used to intercept all keyboard input. Writing captured data to a hidden file and exfiltrating it via periodic outbound connections is the classic keylogger pattern. The regular interval suggests automated exfiltration. Isolate and preserve the log file as evidence.'
       },
       {
         name:'update_helper.exe', purpose:'Process spreading to network shares',
-        path:'C:\\Windows\\Temp\\update_helper.exe', behaviour:'Copying itself to all accessible network shares (\\\\server\\share\\update_helper.exe), creating autorun.inf files, consuming 40% CPU', connections:'Port 445 (SMB) connections to 47 internal hosts in 10 minutes',
+        path:'C:\\Windows\\Temp\\update_helper.exe', location:'Windows\\Temp\\ ⚠', activity:'Self-copying to network shares + autorun.inf', connections:'SMB:445 → 47 internal hosts / 10 min',
         ragAnswer:'R', actionAnswer:'isolate',
         notes:'Worm. Self-replication to network shares via SMB (port 445) without user interaction is the defining worm behaviour. Autorun.inf files execute the payload automatically when a drive is accessed. The breadth of lateral spread (47 hosts in 10 minutes) indicates it is already propagating. Isolate the source host immediately and check all connected shares.'
       },
       {
         name:'pdf_viewer_pro.exe', purpose:'Trojan with remote access capability',
-        path:'C:\\Users\\mwilson\\Downloads\\pdf_viewer_pro.exe', behaviour:'Presents a working PDF viewer UI, simultaneously opening a reverse shell to external IP', connections:'Persistent outbound connection to 203.0.113.42:4444 (known C2 port)',
+        path:'C:\\Users\\mwilson\\Downloads\\pdf_viewer_pro.exe', location:'User Downloads\\ ⚠', activity:'PDF UI front + reverse shell opened', connections:'Persistent → 203.0.113.42:4444 (C2)',
         ragAnswer:'R', actionAnswer:'isolate',
         notes:'Trojan horse with remote access (RAT). Port 4444 is a well-known default for Metasploit reverse shells. The process presents as a legitimate PDF viewer (the trojan component) while maintaining a persistent connection to an attacker-controlled server. The user likely downloaded it believing it was genuine software.'
       },
       {
         name:'sysmon_helper.exe', purpose:'Spyware capturing screen and exfiltrating data',
-        path:'C:\\ProgramData\\Monitoring\\sysmon_helper.exe', behaviour:'Taking screenshots every 90s, enumerating browser history and saved credentials, compressing output to .zip', connections:'Periodic uploads to cloud storage API (not authorised corporate storage)',
+        path:'C:\\ProgramData\\Monitoring\\sysmon_helper.exe', location:'ProgramData (non-standard dir)', activity:'Screenshots + browser creds + .zip upload', connections:'→ unauthorised cloud storage API',
         ragAnswer:'R', actionAnswer:'isolate',
         notes:'Spyware. Unlike a keylogger (keyboard only), this captures broader intelligence: screenshots, browser history and saved credentials. Exfiltration to unauthorised cloud storage is a data loss indicator. The name (sysmon_helper) mimics the legitimate Sysinternals Sysmon tool — another name spoofing attempt.'
       },
       {
         name:'powershell.exe', purpose:'Encoded PowerShell execution at 03:14',
-        path:'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', behaviour:'Launched by scheduled task at 03:14 with flags: -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand [base64 string]', connections:'Outbound HTTPS to 104.21.77.33 during execution only',
+        path:'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', location:'System32 (legit path — check flags)', activity:'-ExecutionPolicy Bypass -Hidden at 03:14', connections:'→ 104.21.77.33 during execution only',
         ragAnswer:'R', actionAnswer:'isolate',
         notes:'Malicious PowerShell execution. -ExecutionPolicy Bypass overrides the policy preventing unsigned scripts. -WindowStyle Hidden prevents the user seeing the window. -EncodedCommand is base64-encoded to evade signature detection. Scheduled task at 03:14 minimises visibility. Legitimate scripts do not require these flags. Decode the base64 and investigate.'
       },
       // AMBER — suspicious, requires investigation
       {
         name:'chrome.exe (unusual)', purpose:'Browser process making high-volume API calls',
-        path:'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', behaviour:'Normal browser process but making 2,000 requests/hour to advertising network APIs — 10× expected rate', connections:'Outbound to multiple ad-network domains',
+        path:'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', location:'Program Files (Google) ✓', activity:'2,000 ad API requests/hr — 10× normal', connections:'→ multiple ad-network domains',
         ragAnswer:'A', actionAnswer:'investigate',
         notes:'Suspicious but not confirmed malware. The path is legitimate (correct Chrome installation directory). However, the request rate is abnormal — could indicate a malicious browser extension performing ad fraud or cryptojacking. Investigate installed extensions and check for recent installs. The process itself is genuine; the behaviour warrants investigation.'
       },
       {
         name:'wscript.exe', purpose:'Windows Script Host executing VBScript',
-        path:'C:\\Windows\\System32\\wscript.exe', behaviour:'Executing a .vbs file from user\'s Downloads folder, which is reading the registry and making network connections', connections:'Outbound to script-delivery.net:80',
+        path:'C:\\Windows\\System32\\wscript.exe', location:'System32 ✓ (check what it runs)', activity:'.vbs from Downloads + registry reads', connections:'→ script-delivery.net:80 ⚠',
         ragAnswer:'A', actionAnswer:'investigate',
         notes:'Suspicious script execution. wscript.exe itself is a legitimate Windows tool, but executing a script from Downloads that accesses the registry and makes network connections is a common malware delivery technique. The domain (script-delivery.net) is not a recognised business destination. Investigate the .vbs file contents.'
       },
       {
         name:'msiexec.exe (silent)', purpose:'Silent MSI package installation',
-        path:'C:\\Windows\\System32\\msiexec.exe', behaviour:'Running with /quiet /norestart flags, installing software to C:\\ProgramData\\Tools\\', connections:'Downloaded installer from 185.220.101.28 (non-standard IP)',
+        path:'C:\\Windows\\System32\\msiexec.exe', location:'System32 ✓ (check install source)', activity:'/quiet /norestart — installing to ProgramData', connections:'Installer from 185.220.101.28 ⚠',
         ragAnswer:'A', actionAnswer:'investigate',
         notes:'Potentially unwanted installation. msiexec.exe is the legitimate Windows Installer, but /quiet suppresses the UI and the source IP is not a known software vendor. This could be a legitimate admin deployment or a malicious installer. Verify with the IT team whether this installation was authorised.'
       },
       // GREEN — legitimate system activity
       {
         name:'MsMpEng.exe', purpose:'Windows Defender antivirus scan',
-        path:'C:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\...\\MsMpEng.exe', behaviour:'High CPU (45%), reading all files on C:\\ — scheduled full scan running', connections:'Checking Microsoft threat intelligence feeds (known Microsoft IPs)',
+        path:'C:\\ProgramData\\Microsoft\\Windows Defender\\...\\MsMpEng.exe', location:'Windows Defender (known path) ✓', activity:'Full disk scan — high CPU (scheduled)', connections:'→ Microsoft threat intel feeds ✓',
         ragAnswer:'G', actionAnswer:'allow',
         notes:'Legitimate: MsMpEng.exe is the Windows Defender antimalware engine. High CPU during a full scan is expected. The path is a known legitimate location. Connections to Microsoft threat intelligence endpoints are standard behaviour. No action required.'
       },
       {
         name:'wuauclt.exe', purpose:'Windows Update downloading patches',
-        path:'C:\\Windows\\System32\\wuauclt.exe', behaviour:'Downloading update packages, writing to C:\\Windows\\SoftwareDistribution\\', connections:'Outbound HTTPS to windowsupdate.microsoft.com (verified Microsoft CDN)',
+        path:'C:\\Windows\\System32\\wuauclt.exe', location:'System32 ✓', activity:'Downloading patches → SoftwareDistribution', connections:'→ windowsupdate.microsoft.com ✓',
         ragAnswer:'G', actionAnswer:'allow',
         notes:'Legitimate: wuauclt.exe is the Windows Update agent. Downloading from verified Microsoft CDN addresses and writing to the standard Windows Update cache directory is expected patch management behaviour. Allow.'
       },
       {
         name:'VeeamAgent.exe', purpose:'Backup software reading all files',
-        path:'C:\\Program Files\\Veeam\\Endpoint Backup\\VeeamAgent.exe', behaviour:'Reading all files on file server — 4,200 file reads/min during scheduled overnight backup window (02:00–05:00)', connections:'Writing to backup NAS (192.168.10.50) — internal network only',
+        path:'C:\\Program Files\\Veeam\\Endpoint Backup\\VeeamAgent.exe', location:'Program Files (Veeam) ✓', activity:'4,200 reads/min — scheduled backup', connections:'→ NAS 192.168.10.50 (internal) ✓',
         ragAnswer:'G', actionAnswer:'allow',
         notes:'Legitimate: this is the Veeam backup agent performing a scheduled nightly backup. High file read rates during the backup window are expected. The destination is an internal NAS appliance, not an external IP. The path is the correct installed location. Allow.'
       },
@@ -1224,17 +1224,18 @@ if(typeof MODULE_LIST !== 'undefined'){
 
 // ── Column definitions for new modules ───────────────────────
 MODULE_COLUMNS.socialEngineering = [
-  { key:'name',            label:'CASE ID'     },
-  { key:'channel',         label:'CHANNEL'     },
-  { key:'claimedIdentity', label:'CLAIMED IDENTITY' },
-  { key:'request',         label:'REQUEST / MESSAGE' },
+  { key:'name',            label:'CASE ID'      },
+  { key:'channel',         label:'CHANNEL'      },
+  { key:'claimedIdentity', label:'CLAIMS TO BE' },
+  { key:'asks',            label:'REQUESTS'     },
+  { key:'redflag',         label:'RED FLAGS'    },
 ];
 
 MODULE_COLUMNS.malwareAnalysis = [
   { key:'name',        label:'PROCESS'       },
-  { key:'path',        label:'EXECUTABLE PATH' },
-  { key:'behaviour',   label:'BEHAVIOUR'     },
-  { key:'connections', label:'NETWORK ACTIVITY' },
+  { key:'location',    label:'PATH TYPE'     },
+  { key:'activity',    label:'KEY ACTIVITY'  },
+  { key:'connections', label:'NETWORK'       },
 ];
 
 // ── Action buttons for new modules ───────────────────────────
