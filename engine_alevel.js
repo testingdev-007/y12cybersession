@@ -1302,7 +1302,7 @@ function closeIPTrace(){
 var IP_TRACE_QUESTIONS = [
   {
     context:'WHOIS: This IP belongs to Mullvad VPN (ASN 39351). The server handles hundreds of simultaneous client connections from different source IPs.',
-    q:'What role is this node playing in the attacker's infrastructure?',
+    q:'What role is this node playing in the attacker\'s infrastructure?',
     options:[
       'The attacker owns this server — it is their personal VPN machine',
       'A shared commercial VPN exit server — many users share this IP, making attribution to one individual difficult without provider cooperation',
@@ -1311,11 +1311,11 @@ var IP_TRACE_QUESTIONS = [
   },
   {
     context:'This IP appears in the public Tor Project exit node list. It operates on ports 9001 and 9030 and handles thousands of relayed connections per hour.',
-    q:'What does this tell you about the attacker's technique?',
+    q:'What does this tell you about the attacker\'s technique?',
     options:[
       'The attacker is physically located in this country — Tor exit nodes are operated by residents',
       'The attacker is routing through a Tor exit node — their real IP is elsewhere in the chain and is not directly visible at this hop',
-      'This is the attacker's home router — they registered it with the Tor Project to blend in'
+      'This is the attacker\'s home router — they registered it with the Tor Project to blend in'
     ], correct:1, hard:false
   },
   {
@@ -1332,7 +1332,7 @@ var IP_TRACE_QUESTIONS = [
     q:'Why would an attacker route through this node?',
     options:[
       'Open proxies are faster than commercial VPNs for high-volume attack traffic',
-      'Using a third party's misconfigured server adds a layer of indirection — the server owner has no knowledge the node is being used, and there are no logs of attacker credentials',
+      'Using a third party\'s misconfigured server adds a layer of indirection — the server owner has no knowledge the node is being used, and there are no logs of attacker credentials',
       'Open proxies provide end-to-end encryption between attacker and target, preventing interception'
     ], correct:1, hard:false
   },
@@ -1346,25 +1346,25 @@ var IP_TRACE_QUESTIONS = [
     ], correct:1, hard:false
   },
   {
-    context:'This IP was provisioned on Amazon Web Services (eu-west-1) 4 hours ago. The attacker's traffic used it for 90 minutes, after which the instance was terminated.',
+    context:'This IP was provisioned on Amazon Web Services (eu-west-1) 4 hours ago. The attacker\'s traffic used it for 90 minutes, after which the instance was terminated.',
     q:'What technique does this represent, and why is it effective for evading forensics?',
     options:[
-      'Cloud amplification — AWS servers boost the attacker's bandwidth automatically',
+      'Cloud amplification — AWS servers boost the attacker\'s bandwidth automatically',
       'Ephemeral infrastructure — short-lived cloud instances leave minimal forensic trace and are destroyed before investigators can image them, requiring cloud provider legal cooperation',
-      'Server hijacking — the attacker broke into an AWS customer's existing server'
+      'Server hijacking — the attacker broke into an AWS customer\'s existing server'
     ], correct:1, hard:true
   },
   {
-    context:'This is the final relay hop. The IP geolocates to a data centre in Frankfurt. A colleague concludes: "We've found the attacker — they're based in Frankfurt."',
+    context:'This is the final relay hop. The IP geolocates to a data centre in Frankfurt. A colleague concludes: "We\'ve found the attacker — they\'re based in Frankfurt."',
     q:'What is wrong with this conclusion?',
     options:[
       'Nothing — if the final IP is in Frankfurt, the attacker must be located there',
-      'This is the last relay, not the origin — the attacker's real location is the unidentified source that connected to this relay, which may itself be another proxy',
+      'This is the last relay, not the origin — the attacker\'s real location is the unidentified source that connected to this relay, which may itself be another proxy',
       'Frankfurt data centres never host attackers — this result indicates a false positive in the trace'
     ], correct:1, hard:true
   },
   {
-    context:'The trace has been documented across 7 hops. An analyst presents the final unresolved origin IP as definitive proof of the attacker's nationality.',
+    context:'The trace has been documented across 7 hops. An analyst presents the final unresolved origin IP as definitive proof of the attacker\'s nationality.',
     q:'What is the most significant forensic limitation of this claim?',
     options:[
       'The trace is too long — forensic attribution is only valid for chains of 3 hops or fewer',
@@ -1374,11 +1374,11 @@ var IP_TRACE_QUESTIONS = [
   },
   {
     context:'Network forensics identifies this as a Tor guard node (entry node) — the first hop in a Tor circuit. The attacker connected to Tor from a source before this.',
-    q:'Can the investigation trace beyond this Tor guard node to find the attacker's real IP?',
+    q:'Can the investigation trace beyond this Tor guard node to find the attacker\'s real IP?',
     options:[
       'Yes — Tor guard nodes retain connection logs for 30 days by design',
-      'Only with legal authority and operator cooperation — guard nodes do not log client IPs in accessible form, and Tor's design separates knowledge of origin and destination across different nodes',
-      'Yes — the attacker's real IP is visible in the Tor Project's public node directory'
+      'Only with legal authority and operator cooperation — guard nodes do not log client IPs in accessible form, and Tor\'s design separates knowledge of origin and destination across different nodes',
+      'Yes — the attacker\'s real IP is visible in the Tor Project\'s public node directory'
     ], correct:1, hard:true
   },
   {
@@ -1391,7 +1391,7 @@ var IP_TRACE_QUESTIONS = [
     ], correct:1, hard:false
   },
   {
-    context:'Packet timestamps show the attacker's traffic entered the first relay at 14:32:07.003 UTC and exits the final relay at 14:32:07.891 UTC — 888ms total across 6 hops.',
+    context:'Packet timestamps show the attacker\'s traffic entered the first relay at 14:32:07.003 UTC and exits the final relay at 14:32:07.891 UTC — 888ms total across 6 hops.',
     q:'What forensic technique could use this timing data to attack proxy chain anonymity?',
     options:[
       'Nothing useful — packet timestamps are too imprecise to be forensically meaningful',
