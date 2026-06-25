@@ -1327,136 +1327,114 @@ function closeIPTrace(){
   schedAutoAdvance(12000);
 }
 
-// ── FORENSIC QUESTION POOL — IP Trace ───────────────────────
-var IP_TRACE_QUESTIONS = [
-  {
-    context:"WHOIS: This IP belongs to Mullvad VPN (ASN 39351). The server handles hundreds of simultaneous client connections from different source IPs.",
-    q:"What role is this node playing in the attacker's infrastructure?",
-    options:[
-      "The attacker owns this server — it is their personal VPN machine",
-      "A shared commercial VPN exit server — many users share this IP, making attribution to one individual difficult without provider cooperation",
-      "A government monitoring server — VPN providers register their infrastructure with national authorities"
-    ], correct:1, hard:false
-  },
-  {
-    context:"This IP appears in the public Tor Project exit node list. It operates on ports 9001 and 9030 and handles thousands of relayed connections per hour.",
-    q:"What does this tell you about the attacker's technique?",
-    options:[
-      "The attacker is physically located in this country — Tor exit nodes are operated by residents",
-      "The attacker is routing through a Tor exit node — their real IP is elsewhere in the chain and is not directly visible at this hop",
-      "This is the attacker's home router — they registered it with the Tor Project to blend in"
-    ], correct:1, hard:false
-  },
-  {
-    context:"This IP belongs to a UK residential ISP (Virgin Media). Logs show scheduled outbound connections at 03:00 daily with no user-initiated activity preceding them.",
-    q:"What is the most likely forensic explanation?",
-    options:[
-      "A compromised residential machine acting as a relay node — botnet-infected home PCs are commonly used as proxy hops because they appear to be ordinary users",
-      "A legitimate remote worker using home broadband — night-shift schedules produce this traffic pattern",
-      "Virgin Media is routing all customer traffic through this address — it is an ISP infrastructure node"
-    ], correct:0, hard:false
-  },
-  {
-    context:"Shodan shows this IP is running an unauthenticated open HTTP proxy on port 8080. The server owner appears unaware of the configuration.",
-    q:"Why would an attacker route through this node?",
-    options:[
-      "Open proxies are faster than commercial VPNs for high-volume attack traffic",
-      "Open proxies provide end-to-end encryption between attacker and target, preventing interception",
-      "Using a third party's misconfigured server adds a layer of indirection — the server owner has no knowledge the node is being used, and there are no logs of attacker credentials"
-    ], correct:2, hard:false
-  },
-  {
-    context:"The trace has now crossed 6 relay nodes in 5 different countries to reach this hop.",
-    q:"Why would an attacker deliberately chain proxies across multiple countries?",
-    options:[
-      "To increase connection speed — distributing load across global servers reduces latency",
-      "To make attribution harder — recovering the full chain requires legal cooperation from every jurisdiction involved, most of which will not respond within an investigation timeline",
-      "To encrypt traffic — each proxy automatically adds an encryption layer to the data stream"
-    ], correct:1, hard:false
-  },
-  {
-    context:"This IP was provisioned on Amazon Web Services (eu-west-1) 4 hours ago. The attacker's traffic used it for 90 minutes, after which the instance was terminated.",
-    q:"What technique does this represent, and why is it effective for evading forensics?",
-    options:[
-      "Ephemeral infrastructure — short-lived cloud instances leave minimal forensic trace and are destroyed before investigators can image them, requiring cloud provider legal cooperation",
-      "Cloud amplification — AWS servers boost the attacker's bandwidth automatically",
-      "Server hijacking — the attacker broke into an AWS customer's existing server"
-    ], correct:0, hard:true
-  },
-  {
-    context:"This is the final relay hop. The IP geolocates to a data centre in Frankfurt. A colleague concludes: 'We have found the attacker — they are based in Frankfurt.'",
-    q:"What is wrong with this conclusion?",
-    options:[
-      "Nothing — if the final IP is in Frankfurt, the attacker must be located there",
-      "Frankfurt data centres never host attackers — this result indicates a false positive in the trace",
-      "This is the last relay, not the origin — the attacker's real location is the unidentified source that connected to this relay, which may itself be another proxy"
-    ], correct:2, hard:true
-  },
-  {
-    context:"The trace has been documented across 7 hops. An analyst presents the final unresolved origin IP as definitive proof of the attacker's nationality.",
-    q:"What is the most significant forensic limitation of this claim?",
-    options:[
-      "The trace is too long — forensic attribution is only valid for chains of 3 hops or fewer",
-      "The origin IP may itself be a compromised machine or proxy — IP attribution in multi-hop chains is probabilistic, not certain, and requires corroborating evidence",
-      "Digital forensics evidence is inadmissible in court — only physical evidence can be used for attribution"
-    ], correct:1, hard:true
-  },
-  {
-    context:"Network forensics identifies this as a Tor guard node (entry node) — the first hop in a Tor circuit. The attacker connected to Tor from a source before this.",
-    q:"Can the investigation trace beyond this Tor guard node to find the attacker's real IP?",
-    options:[
-      "Only with legal authority and operator cooperation — guard nodes do not log client IPs in accessible form, and Tor's design separates knowledge of origin and destination across different nodes",
-      "Yes — Tor guard nodes retain connection logs for 30 days by design",
-      "Yes — the attacker's real IP is visible in the Tor Project's public node directory"
-    ], correct:0, hard:true
-  },
-  {
-    context:"The trace leads to an IP assigned by a UK ISP. The ISP has subscriber records that would identify the account holder at the time of the attack.",
-    q:"What is the correct next investigative step?",
-    options:[
-      "Request the records immediately — public IP addresses are public information and require no legal process to obtain subscriber details",
-      "The investigation ends here — UK ISPs are legally prohibited from cooperating with cybercrime investigations",
-      "Obtain a legal order (court order or production order) — subscriber data is personal information and UK ISPs cannot lawfully disclose it without legal authority"
-    ], correct:2, hard:false
-  },
-  {
-    context:"Packet timestamps show the attacker's traffic entered the first relay at 14:32:07.003 UTC and exits the final relay at 14:32:07.891 UTC — 888ms total across 6 hops.",
-    q:"What forensic technique could use this timing data to attack proxy chain anonymity?",
-    options:[
-      "Nothing useful — packet timestamps are too imprecise to be forensically meaningful",
-      "Packet injection — the 888ms window is used to insert forged packets into the data stream",
-      "Traffic correlation — an observer monitoring both the entry and exit points simultaneously can correlate timing patterns to link a sender to a receiver even without decrypting content"
-    ], correct:2, hard:true
-  },
-  {
-    context:"Trace complete. The origin IP has been identified and the connection severed. The incident response team asks: 'Can we be certain this is the attacker?'",
-    q:"What is the correct forensic answer?",
-    options:[
-      "Likely, but attribution requires corroborating evidence beyond IP tracing — account logs, malware samples, TTPs. The origin device may itself be compromised and used unknowingly.",
-      "Yes — the origin IP is certain; all relay hops were independently verified",
-      "No — IP addresses are legally inadmissible and can never be used as forensic evidence"
-    ], correct:0, hard:true
-  },
-]
+// ── IP TRACE HOP QUESTION GENERATOR ─────────────────────────
 function genHops(n){
-  const qPool = shuffle([...IP_TRACE_QUESTIONS]);
-  return shuffle([...CITIES]).slice(0,n).map((c,i,arr)=>{
-    const q = qPool[i % qPool.length];
-    // Shuffle the options and track where the correct answer lands
-    const indexed = q.options.map((text,idx)=>({text,wasCorrect:idx===q.correct}));
-    const shuffled = shuffle(indexed);
-    const correctIdx = shuffled.findIndex(o=>o.wasCorrect);
+  // Questions defined locally — no global initialisation required
+  var QS = [
+    { c:"WHOIS: This IP belongs to a commercial VPN provider (Mullvad, ASN 39351). The server handles hundreds of simultaneous client connections.",
+      q:"What role is this node playing in the attacker's infrastructure?",
+      opts:["The attacker personally owns this server",
+            "A shared commercial VPN exit — many users share this IP, making individual attribution difficult without legal cooperation",
+            "A government surveillance server — VPNs register with national authorities"],
+      ok:1 },
+    { c:"This IP appears in the Tor Project's published exit node list. It operates on ports 9001 and 9030 and handles thousands of relayed connections per hour.",
+      q:"What does this tell you about the attacker's technique?",
+      opts:["The attacker is physically located in this country — Tor nodes are operated by local residents",
+            "The attacker is routing through a Tor exit node — their real IP is earlier in the chain, not visible at this hop",
+            "This is the attacker's home router, registered with Tor to appear legitimate"],
+      ok:1 },
+    { c:"This IP belongs to a UK residential ISP (Virgin Media). Logs show scheduled outbound connections at 03:00 daily with no user-initiated activity.",
+      q:"What is the most likely forensic explanation?",
+      opts:["A compromised residential machine used as a relay node — botnet-infected home PCs are common proxy hops because they look like ordinary users",
+            "A night-shift remote worker using home broadband",
+            "Virgin Media routing all customer traffic through a shared address"],
+      ok:0 },
+    { c:"Shodan shows this IP is running an unauthenticated open HTTP proxy on port 8080. The server owner appears unaware of this.",
+      q:"Why would an attacker route through this node?",
+      opts:["Open proxies are faster than VPNs for attack traffic",
+            "Open proxies encrypt all traffic end-to-end, preventing interception",
+            "Using a third party's misconfigured server adds indirection — the owner has no knowledge it is being used, and there are no attacker credentials logged"],
+      ok:2 },
+    { c:"The trace has crossed 6 relay nodes across 5 different countries to reach this hop.",
+      q:"Why would an attacker deliberately chain proxies across multiple countries?",
+      opts:["To increase connection speed by distributing load",
+            "To make attribution harder — recovering the full chain requires legal cooperation from every jurisdiction, most of which will not respond in time",
+            "Each proxy automatically adds an encryption layer to the data"],
+      ok:1 },
+    { c:"This IP was provisioned on Amazon Web Services 4 hours ago. The attacker's traffic used it for 90 minutes, then the instance was terminated.",
+      q:"What technique is this, and why is it effective against forensic investigation?",
+      opts:["Ephemeral cloud infrastructure — short-lived instances leave minimal forensic trace and are destroyed before investigators can image them",
+            "Cloud bandwidth amplification — AWS automatically boosts attack throughput",
+            "Server hijacking — the attacker compromised an existing AWS customer's machine"],
+      ok:0 },
+    { c:"This is the final relay hop. The IP geolocates to a data centre in Frankfurt. A colleague says: the attacker is based in Frankfurt.",
+      q:"What is wrong with this conclusion?",
+      opts:["Nothing — if the last IP is in Frankfurt, the attacker is there",
+            "Frankfurt data centres never host attackers — this is a false positive",
+            "This is the last relay, not the origin — the attacker's real location is the unidentified source that used this relay, which may itself be another proxy"],
+      ok:2 },
+    { c:"The trace documents 7 hops. An analyst presents the final IP as definitive proof of the attacker's nationality.",
+      q:"What is the most significant forensic limitation of this claim?",
+      opts:["Traces over 3 hops are legally inadmissible as forensic evidence",
+            "The origin IP may itself be a compromised machine — IP attribution across multi-hop chains is probabilistic, not certain, and requires corroborating evidence",
+            "Digital forensics is never admissible in court"],
+      ok:1 },
+    { c:"Network forensics identifies this as a Tor guard node — the first hop in a Tor circuit. The attacker connected to Tor from a source before this.",
+      q:"Can the investigation trace beyond this Tor guard node?",
+      opts:["Only with legal authority and operator cooperation — guard nodes do not log client IPs accessibly, and Tor separates origin and destination knowledge across different nodes",
+            "Yes — Tor guard nodes keep 30-day connection logs",
+            "Yes — the attacker's real IP is in the Tor Project's public node directory"],
+      ok:0 },
+    { c:"The trace leads to a UK ISP-assigned IP. The ISP holds subscriber records that would identify the account holder.",
+      q:"What is the correct next investigative step?",
+      opts:["Request records immediately — public IPs require no legal process",
+            "The investigation ends here — UK ISPs cannot cooperate with cybercrime investigations",
+            "Obtain a legal order (court order or production order) — subscriber data is personal information that UK ISPs cannot lawfully disclose without legal authority"],
+      ok:2 },
+    { c:"Packet timestamps show the attacker's traffic entered the first relay at 14:32:07.003 UTC and exits the final relay at 14:32:07.891 UTC — 888ms across 6 hops.",
+      q:"What forensic technique could use this timing data?",
+      opts:["Nothing — packet timestamps are too imprecise to be useful",
+            "Traffic correlation — monitoring both entry and exit simultaneously allows linking sender to receiver by timing patterns, even without decrypting content",
+            "Packet injection — the 888ms gap allows inserting forged packets"],
+      ok:1 },
+    { c:"Trace complete. The origin IP is identified. The incident response team asks: can we be certain this is the attacker?",
+      q:"What is the correct forensic answer?",
+      opts:["Yes — all hops were verified, the origin IP is certain",
+            "No — IP addresses are legally inadmissible, never usable as evidence",
+            "Likely, but attribution requires corroborating evidence — account logs, malware samples, TTPs. The origin device may itself be compromised."],
+      ok:2 },
+  ];
+
+  // Shuffle question pool
+  var pool = QS.slice();
+  for(var pi=pool.length-1;pi>0;pi--){var pj=Math.floor(Math.random()*(pi+1));var pt=pool[pi];pool[pi]=pool[pj];pool[pj]=pt;}
+
+  // Build hops
+  var cityPool = CITIES.slice();
+  for(var ci=cityPool.length-1;ci>0;ci--){var cj=Math.floor(Math.random()*(ci+1));var ct=cityPool[ci];cityPool[ci]=cityPool[cj];cityPool[cj]=ct;}
+  var selected = cityPool.slice(0, Math.min(n, cityPool.length));
+
+  return selected.map(function(city, i){
+    var q = pool[i % pool.length];
+    // Shuffle this question's options
+    var opts = q.opts.map(function(text, idx){ return {text:text, isRight:(idx===q.ok)}; });
+    for(var oi=opts.length-1;oi>0;oi--){var oj=Math.floor(Math.random()*(oi+1));var ot=opts[oi];opts[oi]=opts[oj];opts[oj]=ot;}
+    var rightIdx = opts.findIndex(function(o){ return o.isRight; });
     return {
-      ...c,
-      ip:`${randInt(2,220)}.${randInt(0,254)}.${randInt(0,254)}.${randInt(1,254)}`,
-      hard: i >= arr.length - 2,
-      question: q.q,
-      context: q.context,
-      options: shuffled.map(o=>o.text),
-      correct: correctIdx,
+      city:    city.city,
+      country: city.country,
+      lat:     city.lat,
+      lon:     city.lon,
+      ip:      randInt(2,220)+'.'+randInt(0,254)+'.'+randInt(0,254)+'.'+randInt(1,254),
+      hard:    i >= selected.length - 2,
+      context: q.c,
+      question:q.q,
+      options: opts.map(function(o){ return o.text; }),
+      correct: rightIdx,
     };
   });
 }
+
 
 // ── CHAT ──────────────────────────────────────────────────────
 function gcMsg(pId,msg,delay=0){
