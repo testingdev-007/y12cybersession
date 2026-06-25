@@ -880,42 +880,56 @@ var CITIES=[
 
 function presentHopChallenge(hopIdx){
   try{SFX.sonar();}catch(ex){}
-  const s=GS.ip;const hop=s.hops[hopIdx];
-  s.waitingForAnswer=true;s.currentChallengeHop=hopIdx;
+  const s=GS.ip; if(!s||s.done)return;
+  const hop=s.hops[hopIdx];
+  if(!hop||!hop.options){console.warn('presentHopChallenge: bad hop',hopIdx,hop);return;}
+  s.waitingForAnswer=true; s.currentChallengeHop=hopIdx;
   s.hopStartTime=Date.now();
   const isFinal=(hopIdx===s.hops.length-1);
 
-  // Show relay node IP and location as forensic context (not the question answer)
-  document.getElementById('ipCurrentIP').textContent=hop.ip;
-  document.getElementById('ipCurrentCity').textContent='📍 '+hop.city+', '+hop.country;
+  // Update map location display
+  var ipEl=document.getElementById('ipCurrentIP');
+  var cityEl=document.getElementById('ipCurrentCity');
+  if(ipEl)  ipEl.textContent=hop.ip;
+  if(cityEl)cityEl.textContent='📍 '+hop.city+', '+hop.country;
 
-  // Build question display
-  const cont=document.getElementById('ipEasyOpts');cont.innerHTML='';
+  // Build modal content — use showGameModal (already proven to work)
+  var header=isFinal
+    ? '<div class="gm-flash" style="color:var(--amb)">⚠ ORIGIN NODE — FINAL ANALYSIS</div>'
+    : '<div class="gm-flash" style="color:var(--g);font-size:11px;letter-spacing:.1em;">HOP '+(hopIdx+1)+'/'+s.hops.length+' — '+esc(hop.city)+', '+esc(hop.country)+'</div>';
 
-  // Context + question
-  const qWrap=document.createElement('div');
-  qWrap.style.cssText='width:100%;margin-bottom:10px;text-align:left;';
-  qWrap.innerHTML=
-    '<div style="font-size:10px;color:rgba(0,255,65,.5);letter-spacing:.12em;margin-bottom:5px;">'
-    +(isFinal?'⚠ ORIGIN NODE — FINAL ANALYSIS:':hop.hard?'ADVANCED ANALYSIS REQUIRED:':'RELAY NODE ANALYSIS:')
-    +'</div>'
-    +'<div style="font-size:11px;color:rgba(0,255,65,.65);font-style:italic;margin-bottom:8px;line-height:1.5;">'
-    +esc(hop.context)+'</div>'
-    +'<div style="font-size:13px;color:#00ff99;font-weight:600;line-height:1.4;">'
-    +esc(hop.question)+'</div>';
-  cont.appendChild(qWrap);
+  var contextDiv='<div style="font-size:11px;color:rgba(0,255,65,.6);font-style:italic;margin:6px 0 10px;line-height:1.5;text-align:left;">'+esc(hop.context)+'</div>';
+  var questionDiv='<div style="font-size:13px;color:#00ff99;font-weight:600;line-height:1.4;margin-bottom:12px;text-align:left;">'+esc(hop.question)+'</div>';
 
-  // Answer option buttons
-  hop.options.forEach((optText,idx)=>{
-    const b=document.createElement('button');
-    b.className='iptextopt';
-    b.textContent=optText;
-    b.onclick=()=>handleHopAnswer(idx===hop.correct,hop,isFinal);
-    cont.appendChild(b);
-  });
+  var optBtns=hop.options.map(function(optText,idx){
+    return '<button class="iptextopt" style="margin-bottom:8px;" onclick="_hopAnswer('+idx+')">'+esc(optText)+'</button>';
+  }).join('');
 
-  document.getElementById('ipEasyOpts').style.display='flex';
-  document.getElementById('ipEasyOpts').style.flexDirection='column';
+  var html=header+contextDiv+questionDiv+optBtns;
+
+  // Expose answer handler globally so inline onclick can reach it
+  window._hopAnswer=function(idx){
+    // Close modal
+    var el=document.getElementById('gameModal');
+    var body=document.getElementById('gameModalBody');
+    if(el) el.style.display='none';
+    if(body) body.innerHTML='';
+    window._hopAnswer=null;
+    handleHopAnswer(idx===hop.correct, hop, isFinal);
+  };
+
+  // Show in game modal (no onClose callback — buttons handle their own close)
+  var el=document.getElementById('gameModal');
+  var body=document.getElementById('gameModalBody');
+  if(el&&body){
+    body.innerHTML=html;
+    el.style.display='flex';
+  } else {
+    // Fallback: gameModal missing — degrade gracefully
+    console.warn('gameModal not found — IP trace question skipped');
+    handleHopAnswer(true, hop, isFinal); // auto-advance rather than hang
+  }
+
   startMapPulse();
 }
 
