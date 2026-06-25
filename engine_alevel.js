@@ -921,37 +921,41 @@ function presentHopChallenge(hopIdx){
 
 function handleHopAnswer(correct,hop,isFinal){
   stopMapPulse();
-  document.getElementById('ipEasyOpts').innerHTML='';
+  // Defensive clear — guard against null in case of timing edge cases
+  var optsEl=document.getElementById('ipEasyOpts');
+  if(optsEl) optsEl.innerHTML='';
   const s=GS.ip;
   const elapsed=Date.now()-(s.hopStartTime||0);
 
   if(!correct){
     clearInterval(s.ti);
-    stopMapPulse();
     if(TRACER.animId){cancelAnimationFrame(TRACER.animId);TRACER.animId=null;}
     try{SFX.bgStop();}catch(ex){}
-    // Show the correct answer in the question area for 2 seconds, then modal
-    const statEl=document.getElementById('ipStat');
-    const opts=document.getElementById('ipEasyOpts');
-    const correctText=hop.options[hop.correct];
-    if(statEl) statEl.innerHTML='<span style="color:var(--red);">&#10007; INCORRECT</span>';
-    if(opts){
-      opts.innerHTML='';
-      const ansDiv=document.createElement('div');
-      ansDiv.style.cssText='width:100%;padding:12px 14px;background:rgba(0,255,65,.06);border:1px solid rgba(0,255,65,.4);border-radius:5px;font-size:12px;color:rgba(0,255,65,.85);line-height:1.5;text-align:left;';
-      ansDiv.innerHTML='<span style="color:rgba(0,255,65,.5);font-size:10px;letter-spacing:.1em;">CORRECT ANSWER</span><br>'+esc(correctText);
-      opts.appendChild(ansDiv);
-      opts.style.display='flex';
-      opts.style.flexDirection='column';
+    // Include correct answer directly in the modal — no DOM manipulation, no timeout
+    var correctText=(hop.options&&hop.correct!=null)?hop.options[hop.correct]:'';
+    var answerBlock=correctText
+      ? '<div style="background:rgba(0,255,65,.06);border:1px solid rgba(0,255,65,.3);border-radius:5px;padding:10px 12px;margin:10px 0 16px;font-size:11px;color:rgba(0,255,65,.85);line-height:1.5;text-align:left;"><span style="display:block;font-size:9px;letter-spacing:.12em;color:rgba(0,255,65,.45);margin-bottom:5px;">CORRECT ANSWER</span>'+esc(correctText)+'</div>'
+      : '';
+    if(!s.usedRetry){
+      var html='<div class="gm-flash" style="color:var(--red)">&#10007; INCORRECT</div>'
+              +'<div class="gm-title" style="margin-bottom:4px;">Wrong answer for <strong>'+esc(hop.city)+'</strong> relay.</div>'
+              +answerBlock
+              +'<div style="display:flex;gap:10px;">'
+              +'<button class="btn btn-g btn-orb gm-ok" id="gameModalOk" style="flex:1">&#8635; RETRY TRACE (45s)</button>'
+              +'<button class="btn btn-sm btn-d" id="ipGiveUp" style="flex:1">ABANDON TRACE</button>'
+              +'</div>';
+      showGameModal(html, function(){ retryIPTrace(); });
+      setTimeout(function(){
+        var g=document.getElementById('ipGiveUp');
+        if(g) g.onclick=function(){
+          var el=gameModalEl(); if(el) el.style.display='none';
+          var body=document.getElementById('gameModalBody'); if(body) body.innerHTML='';
+          declineRetryIPTrace();
+        };
+      },0);
+    } else {
+      endTrace(false,'Incorrect analysis for '+hop.city+' relay.');
     }
-    // 2 second pause so student can read the correct answer, then modal
-    setTimeout(function(){
-      if(!s.usedRetry){
-        showIPRetryModal('Review the correct answer above, then choose to retry or abandon the trace.');
-      } else {
-        endTrace(false,'Incorrect analysis for '+hop.city+' relay.');
-      }
-    },2200);
     return;
   }
 
