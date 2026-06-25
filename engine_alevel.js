@@ -927,17 +927,31 @@ function handleHopAnswer(correct,hop,isFinal){
 
   if(!correct){
     clearInterval(s.ti);
-    // Cancel BOTH animation loops — idle map AND pulse — so they don't
-    // saturate the main thread while the retry modal is on screen
     stopMapPulse();
     if(TRACER.animId){cancelAnimationFrame(TRACER.animId);TRACER.animId=null;}
     try{SFX.bgStop();}catch(ex){}
-    // First failure: offer a retry; second failure: actually fail
-    if(!s.usedRetry){
-      showIPRetryModal('Incorrect for '+hop.city+' relay. The correct analysis was: option '+(hop.correct+1)+'.');
-    } else {
-      endTrace(false,'Incorrect analysis for '+hop.city+' relay.');
+    // Show the correct answer in the question area for 2 seconds, then modal
+    const statEl=document.getElementById('ipStat');
+    const opts=document.getElementById('ipEasyOpts');
+    const correctText=hop.options[hop.correct];
+    if(statEl) statEl.innerHTML='<span style="color:var(--red);">&#10007; INCORRECT</span>';
+    if(opts){
+      opts.innerHTML='';
+      const ansDiv=document.createElement('div');
+      ansDiv.style.cssText='width:100%;padding:12px 14px;background:rgba(0,255,65,.06);border:1px solid rgba(0,255,65,.4);border-radius:5px;font-size:12px;color:rgba(0,255,65,.85);line-height:1.5;text-align:left;';
+      ansDiv.innerHTML='<span style="color:rgba(0,255,65,.5);font-size:10px;letter-spacing:.1em;">CORRECT ANSWER</span><br>'+esc(correctText);
+      opts.appendChild(ansDiv);
+      opts.style.display='flex';
+      opts.style.flexDirection='column';
     }
+    // 2 second pause so student can read the correct answer, then modal
+    setTimeout(function(){
+      if(!s.usedRetry){
+        showIPRetryModal('Review the correct answer above, then choose to retry or abandon the trace.');
+      } else {
+        endTrace(false,'Incorrect analysis for '+hop.city+' relay.');
+      }
+    },2200);
     return;
   }
 
@@ -1274,8 +1288,8 @@ function retryIPTrace(){
   // Restart the idle map animation (was cancelled when wrong answer was given)
   drawTacticalMapIdle();
   startIPCountdown();
-  gcMsg('zara','Retry authorised — 45 seconds. Verify each IP character by character.',200);
-  gcMsg('marcus','Last-hop IPs differ by a single octet. Read them methodically — do not rush.',800);
+  gcMsg('zara','Retry authorised — 45 seconds. Read each question carefully before answering.',200);
+  gcMsg('marcus','There is only one correct answer per question. Take your time — the timer is reset.',800);
   setTimeout(()=>advanceHop(),2000);
 }
 
@@ -1319,19 +1333,19 @@ var IP_TRACE_QUESTIONS = [
     context:"This IP belongs to a UK residential ISP (Virgin Media). Logs show scheduled outbound connections at 03:00 daily with no user-initiated activity preceding them.",
     q:"What is the most likely forensic explanation?",
     options:[
-      "A legitimate remote worker using home broadband — night-shift schedules produce this traffic pattern",
       "A compromised residential machine acting as a relay node — botnet-infected home PCs are commonly used as proxy hops because they appear to be ordinary users",
+      "A legitimate remote worker using home broadband — night-shift schedules produce this traffic pattern",
       "Virgin Media is routing all customer traffic through this address — it is an ISP infrastructure node"
-    ], correct:1, hard:false
+    ], correct:0, hard:false
   },
   {
     context:"Shodan shows this IP is running an unauthenticated open HTTP proxy on port 8080. The server owner appears unaware of the configuration.",
     q:"Why would an attacker route through this node?",
     options:[
       "Open proxies are faster than commercial VPNs for high-volume attack traffic",
-      "Using a third party's misconfigured server adds a layer of indirection — the server owner has no knowledge the node is being used, and there are no logs of attacker credentials",
-      "Open proxies provide end-to-end encryption between attacker and target, preventing interception"
-    ], correct:1, hard:false
+      "Open proxies provide end-to-end encryption between attacker and target, preventing interception",
+      "Using a third party's misconfigured server adds a layer of indirection — the server owner has no knowledge the node is being used, and there are no logs of attacker credentials"
+    ], correct:2, hard:false
   },
   {
     context:"The trace has now crossed 6 relay nodes in 5 different countries to reach this hop.",
@@ -1346,19 +1360,19 @@ var IP_TRACE_QUESTIONS = [
     context:"This IP was provisioned on Amazon Web Services (eu-west-1) 4 hours ago. The attacker's traffic used it for 90 minutes, after which the instance was terminated.",
     q:"What technique does this represent, and why is it effective for evading forensics?",
     options:[
-      "Cloud amplification — AWS servers boost the attacker's bandwidth automatically",
       "Ephemeral infrastructure — short-lived cloud instances leave minimal forensic trace and are destroyed before investigators can image them, requiring cloud provider legal cooperation",
+      "Cloud amplification — AWS servers boost the attacker's bandwidth automatically",
       "Server hijacking — the attacker broke into an AWS customer's existing server"
-    ], correct:1, hard:true
+    ], correct:0, hard:true
   },
   {
     context:"This is the final relay hop. The IP geolocates to a data centre in Frankfurt. A colleague concludes: 'We have found the attacker — they are based in Frankfurt.'",
     q:"What is wrong with this conclusion?",
     options:[
       "Nothing — if the final IP is in Frankfurt, the attacker must be located there",
-      "This is the last relay, not the origin — the attacker's real location is the unidentified source that connected to this relay, which may itself be another proxy",
-      "Frankfurt data centres never host attackers — this result indicates a false positive in the trace"
-    ], correct:1, hard:true
+      "Frankfurt data centres never host attackers — this result indicates a false positive in the trace",
+      "This is the last relay, not the origin — the attacker's real location is the unidentified source that connected to this relay, which may itself be another proxy"
+    ], correct:2, hard:true
   },
   {
     context:"The trace has been documented across 7 hops. An analyst presents the final unresolved origin IP as definitive proof of the attacker's nationality.",
@@ -1373,37 +1387,37 @@ var IP_TRACE_QUESTIONS = [
     context:"Network forensics identifies this as a Tor guard node (entry node) — the first hop in a Tor circuit. The attacker connected to Tor from a source before this.",
     q:"Can the investigation trace beyond this Tor guard node to find the attacker's real IP?",
     options:[
-      "Yes — Tor guard nodes retain connection logs for 30 days by design",
       "Only with legal authority and operator cooperation — guard nodes do not log client IPs in accessible form, and Tor's design separates knowledge of origin and destination across different nodes",
+      "Yes — Tor guard nodes retain connection logs for 30 days by design",
       "Yes — the attacker's real IP is visible in the Tor Project's public node directory"
-    ], correct:1, hard:true
+    ], correct:0, hard:true
   },
   {
     context:"The trace leads to an IP assigned by a UK ISP. The ISP has subscriber records that would identify the account holder at the time of the attack.",
     q:"What is the correct next investigative step?",
     options:[
       "Request the records immediately — public IP addresses are public information and require no legal process to obtain subscriber details",
-      "Obtain a legal order (court order or production order) — subscriber data is personal information and UK ISPs cannot lawfully disclose it without legal authority",
-      "The investigation ends here — UK ISPs are legally prohibited from cooperating with cybercrime investigations"
-    ], correct:1, hard:false
+      "The investigation ends here — UK ISPs are legally prohibited from cooperating with cybercrime investigations",
+      "Obtain a legal order (court order or production order) — subscriber data is personal information and UK ISPs cannot lawfully disclose it without legal authority"
+    ], correct:2, hard:false
   },
   {
     context:"Packet timestamps show the attacker's traffic entered the first relay at 14:32:07.003 UTC and exits the final relay at 14:32:07.891 UTC — 888ms total across 6 hops.",
     q:"What forensic technique could use this timing data to attack proxy chain anonymity?",
     options:[
       "Nothing useful — packet timestamps are too imprecise to be forensically meaningful",
-      "Traffic correlation — an observer monitoring both the entry and exit points simultaneously can correlate timing patterns to link a sender to a receiver even without decrypting content",
-      "Packet injection — the 888ms window is used to insert forged packets into the data stream"
-    ], correct:1, hard:true
+      "Packet injection — the 888ms window is used to insert forged packets into the data stream",
+      "Traffic correlation — an observer monitoring both the entry and exit points simultaneously can correlate timing patterns to link a sender to a receiver even without decrypting content"
+    ], correct:2, hard:true
   },
   {
     context:"Trace complete. The origin IP has been identified and the connection severed. The incident response team asks: 'Can we be certain this is the attacker?'",
     q:"What is the correct forensic answer?",
     options:[
-      "Yes — the origin IP is certain; all relay hops were independently verified",
       "Likely, but attribution requires corroborating evidence beyond IP tracing — account logs, malware samples, TTPs. The origin device may itself be compromised and used unknowingly.",
+      "Yes — the origin IP is certain; all relay hops were independently verified",
       "No — IP addresses are legally inadmissible and can never be used as forensic evidence"
-    ], correct:1, hard:true
+    ], correct:0, hard:true
   },
 ]
 function genHops(n){
