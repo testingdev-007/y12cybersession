@@ -880,58 +880,72 @@ var CITIES=[
 
 function presentHopChallenge(hopIdx){
   try{SFX.sonar();}catch(ex){}
-  const s=GS.ip; if(!s||s.done)return;
-  const hop=s.hops[hopIdx];
-  if(!hop||!hop.options){console.warn('presentHopChallenge: bad hop',hopIdx,hop);return;}
-  s.waitingForAnswer=true; s.currentChallengeHop=hopIdx;
+  var s=GS.ip; if(!s||s.done)return;
+  var hop=s.hops[hopIdx];
+  if(!hop||!hop.options||!hop.options.length){
+    // Guard failed — auto-advance rather than hang
+    setTimeout(function(){ if(!s.done) advanceHop(); }, 500);
+    return;
+  }
+  s.waitingForAnswer=true;
+  s.currentChallengeHop=hopIdx;
   s.hopStartTime=Date.now();
-  const isFinal=(hopIdx===s.hops.length-1);
+  var isFinal=(hopIdx===s.hops.length-1);
 
-  // Update map location display
+  // Update location display
   var ipEl=document.getElementById('ipCurrentIP');
   var cityEl=document.getElementById('ipCurrentCity');
   if(ipEl)  ipEl.textContent=hop.ip;
   if(cityEl)cityEl.textContent='📍 '+hop.city+', '+hop.country;
 
-  // Build modal content — use showGameModal (already proven to work)
-  var header=isFinal
-    ? '<div class="gm-flash" style="color:var(--amb)">⚠ ORIGIN NODE — FINAL ANALYSIS</div>'
-    : '<div class="gm-flash" style="color:var(--g);font-size:11px;letter-spacing:.1em;">HOP '+(hopIdx+1)+'/'+s.hops.length+' — '+esc(hop.city)+', '+esc(hop.country)+'</div>';
+  // HIDE THE MAP to make space for the question on small screens
+  var mapWrap=document.getElementById('ipMapWrap');
+  if(mapWrap) mapWrap.style.display='none';
 
-  var contextDiv='<div style="font-size:11px;color:rgba(0,255,65,.6);font-style:italic;margin:6px 0 10px;line-height:1.5;text-align:left;">'+esc(hop.context)+'</div>';
-  var questionDiv='<div style="font-size:13px;color:#00ff99;font-weight:600;line-height:1.4;margin-bottom:12px;text-align:left;">'+esc(hop.question)+'</div>';
+  // Build question HTML in the ipEasyOpts container
+  var opts=document.getElementById('ipEasyOpts');
+  if(!opts) return;
+  opts.innerHTML='';
+  opts.style.cssText='display:block;width:100%;';
 
-  var optBtns=hop.options.map(function(optText,idx){
-    return '<button class="iptextopt" style="margin-bottom:8px;" onclick="_hopAnswer('+idx+')">'+esc(optText)+'</button>';
-  }).join('');
+  // Hop label
+  var label=document.createElement('div');
+  label.style.cssText='font-size:10px;letter-spacing:.12em;color:rgba(0,255,65,.45);margin-bottom:8px;';
+  label.textContent=(isFinal?'⚠ ORIGIN NODE — FINAL ANALYSIS':'HOP '+(hopIdx+1)+'/'+s.hops.length+' — '+hop.city+', '+hop.country);
+  opts.appendChild(label);
 
-  var html=header+contextDiv+questionDiv+optBtns;
+  // Context
+  var ctx=document.createElement('div');
+  ctx.style.cssText='font-size:11px;color:rgba(0,255,65,.6);font-style:italic;margin-bottom:8px;line-height:1.5;';
+  ctx.textContent=hop.context;
+  opts.appendChild(ctx);
 
-  // Expose answer handler globally so inline onclick can reach it
-  window._hopAnswer=function(idx){
-    // Close modal
-    var el=document.getElementById('gameModal');
-    var body=document.getElementById('gameModalBody');
-    if(el) el.style.display='none';
-    if(body) body.innerHTML='';
-    window._hopAnswer=null;
-    handleHopAnswer(idx===hop.correct, hop, isFinal);
-  };
+  // Question
+  var qEl=document.createElement('div');
+  qEl.style.cssText='font-size:13px;color:#00ff99;font-weight:600;line-height:1.4;margin-bottom:10px;';
+  qEl.textContent=hop.question;
+  opts.appendChild(qEl);
 
-  // Show in game modal (no onClose callback — buttons handle their own close)
-  var el=document.getElementById('gameModal');
-  var body=document.getElementById('gameModalBody');
-  if(el&&body){
-    body.innerHTML=html;
-    el.style.display='flex';
-  } else {
-    // Fallback: gameModal missing — degrade gracefully
-    console.warn('gameModal not found — IP trace question skipped');
-    handleHopAnswer(true, hop, isFinal); // auto-advance rather than hang
-  }
-
-  startMapPulse();
+  // Answer buttons — addEventListener, NOT onclick attribute
+  hop.options.forEach(function(optText, idx){
+    var btn=document.createElement('button');
+    btn.style.cssText='display:block;width:100%;padding:10px 12px;margin-bottom:8px;'
+      +'background:rgba(0,255,65,.06);border:1px solid rgba(0,255,65,.3);border-radius:5px;'
+      +'color:rgba(0,255,65,.85);font-size:12px;line-height:1.4;text-align:left;cursor:pointer;'
+      +'font-family:inherit;-webkit-appearance:none;';
+    btn.textContent=optText;
+    btn.addEventListener('click', function(){
+      // Disable all buttons immediately to prevent double-fire
+      var allBtns=opts.querySelectorAll('button');
+      allBtns.forEach(function(b){ b.disabled=true; });
+      // Show map again
+      if(mapWrap) mapWrap.style.display='';
+      handleHopAnswer(idx===hop.correct, hop, isFinal);
+    });
+    opts.appendChild(btn);
+  });
 }
+
 
 function handleHopAnswer(correct,hop,isFinal){
   stopMapPulse();
