@@ -31,7 +31,7 @@ var GS = {
   correctTool:null, toolOk:false,
   reportReady:false,
   active:false,
-  phishDone:false, ipDone:false,
+  phishDone:false, ipDone:false, difficulty:1, preBriefDone:new Set(),
   queue:[], forceMod:null,
   badTools:0,
   sessId:uid(),
@@ -320,7 +320,14 @@ function refreshInbox(){
 function dispatchMod(id){
   if(id==='__phish__')  loadPhish();
   else if(id==='__iptrace__') loadIPTrace();
-  else loadModule(id);
+  else {
+    var _m=MODULES[id];
+    if(_m&&_m.diagnosticQuestions&&_m.diagnosticQuestions.length&&!GS.preBriefDone.has(id)){
+      showPreBrief(_m,function(){ GS.preBriefDone.add(id); loadModule(id); });
+    } else {
+      loadModule(id);
+    }
+  }
 }
 function buildQueue(){
   // Anti-repetition queue builder
@@ -349,11 +356,7 @@ function buildQueue(){
   // Cap to MODULE_LIST length so the array never grows stale
   while(recent.length>MODULE_LIST.length)recent.shift();
 
-  // Insert BOTH exceptions at non-adjacent random positions
-  mods.splice(randInt(0,mods.length),0,'__phish__');
-  var p=randInt(0,mods.length);
-  while(mods[p]==='__phish__')p=randInt(0,mods.length);
-  mods.splice(p,0,'__iptrace__');
+  // Exceptions (phishing, IP trace) removed for this version
   GS.queue=mods;
 }
 function schedAutoAdvance(delay=18000){
@@ -379,12 +382,12 @@ function buildScenarioParams(){
   // All-green: once per game, not first round, not if last was already low
   if(!f.allGreenUsed && !f.lastWasLow && r>=2 && r<GS.totalRounds && Math.random()>.72){
     f.allGreenUsed=true;
-    return {numEscalations:0,escalationType:'none',includeEdgeCase:false,numItems:6};
+    return {numEscalations:0,escalationType:'none',includeEdgeCase:false,numItems:6,difficulty:GS.difficulty||1};
   }
   // High escalation: once per game, not first round
   if(!f.highEscalationUsed && r>=2 && Math.random()>.55){
     f.highEscalationUsed=true;
-    return {numEscalations:randInt(3,4),escalationType:pick(['RED_RED_AMBER','RED_RED_RED','RED_AMBER_AMBER']),includeEdgeCase:true,numItems:7};
+    return {numEscalations:randInt(3,4),escalationType:pick(['RED_RED_AMBER','RED_RED_RED','RED_AMBER_AMBER']),includeEdgeCase:true,numItems:7,difficulty:GS.difficulty||1};
   }
   // Prevent two sequential low-escalation rounds
   const minE=f.lastWasLow?2:1;
@@ -397,8 +400,144 @@ function buildScenarioParams(){
     if(alts.length) escalType=alts[0];
   }
   SESSION_HISTORY.scenarioKeys.add(`${GS.modId}_${numE}_${escalType}`);
-  return {numEscalations:numE,escalationType:escalType,includeEdgeCase:Math.random()>.3,numItems:6};
+  return {numEscalations:numE,escalationType:escalType,includeEdgeCase:Math.random()>.3,numItems:6,difficulty:GS.difficulty||1};
 }
+
+
+
+
+// ── ANALYST PRE-BRIEF — diagnostic & adaptive difficulty ─────
+var _pb = {};
+
+function showPreBrief(mod, onComplete){
+  if(!mod||!mod.diagnosticQuestions||!mod.diagnosticQuestions.length){if(onComplete)onComplete();return;}
+  function shuf(arr){var a=arr.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+  _pb={
+    pool:shuf(mod.diagnosticQuestions).slice(0,5),
+    idx:0, score:0, onComplete:onComplete,
+    summary:mod.diagnosticSummary||'', name:mod.name,
+    shuffled:null, correctIdx:0
+  };
+  _pbShowQ();
+}
+
+function _pbShowQ(){
+  var idx=_pb.idx;
+  var q=_pb.pool[idx];
+  var mapped=q.opts.map(function(t,i){return{text:t,ok:(i===q.ok),hint:q.hint||''};});
+  for(var i=mapped.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=mapped[i];mapped[i]=mapped[j];mapped[j]=t;}
+  _pb.shuffled=mapped;
+  _pb.correctIdx=mapped.findIndex(function(o){return o.ok;});
+
+  var pct=Math.round((idx/5)*100)+'%';
+  var opts='';
+  mapped.forEach(function(opt,i){
+    opts+='<button class="pb-opt" onclick="_pbAnswer('+i+')">'+esc(opt.text)+'</button>';
+  });
+
+  var html=
+    '<div class="pb-hdr">ANALYST PRE-BRIEF &mdash; '+esc(_pb.name)+'</div>'+
+    '<div class="pb-prog-wrap">'+
+    '<div class="pb-prog-track"><div class="pb-prog-fill" id="pbFill" style="width:'+pct+'"></div></div>'+
+    '<div class="pb-prog-lbl">QUESTION '+(idx+1)+' OF 5</div>'+
+    '</div>'+
+    '<details class="pb-ref">'+
+    '<summary>Background reference</summary>'+
+    '<div class="pb-ref-body">'+esc(_pb.summary)+'</div>'+
+    '</details>'+
+    '<div class="pb-q-wrap">'+
+    '<div class="pb-q">'+esc(q.q)+'</div>'+
+    opts+
+    '</div>';
+
+  var el=document.getElementById('gameModal');
+  var body=document.getElementById('gameModalBody');
+  if(el&&body){body.innerHTML=html;el.style.display='flex';}
+  // Animate fill bar after render
+  requestAnimationFrame(function(){
+    var fill=document.getElementById('pbFill');
+    if(fill) fill.style.width=pct;
+  });
+}
+
+window._pbAnswer=function(chosen){
+  var correct=(chosen===_pb.correctIdx);
+  if(correct) _pb.score++;
+  var hint=_pb.shuffled[_pb.correctIdx].hint;
+  _pb.idx++;
+
+  var body=document.getElementById('gameModalBody');
+  if(!body) return;
+
+  // Style the option buttons
+  body.querySelectorAll('.pb-opt').forEach(function(b,i){
+    b.disabled=true;
+    if(i===_pb.correctIdx) b.className='pb-opt pb-ok';
+    else if(i===chosen&&!correct) b.className='pb-opt pb-err';
+    else b.className='pb-opt pb-dim';
+  });
+
+  // Append feedback
+  var fb=document.createElement('div');
+  fb.className='pb-fb';
+  fb.innerHTML=
+    '<div class="pb-fb-result" style="color:'+(correct?'var(--g)':'var(--red)')+';">'
+    +(correct?'&#10003; CORRECT':'&#10007; INCORRECT')+'</div>'
+    +(hint?'<div class="pb-fb-hint">'+esc(hint)+'</div>':'')
+    +'<button class="pb-next" onclick="_pbNext()">'
+    +(_pb.idx<_pb.pool.length?'NEXT QUESTION &rarr;':'SEE RESULTS &rarr;')+'</button>';
+  body.appendChild(fb);
+  body.scrollTop=9999;
+};
+
+window._pbNext=function(){
+  if(_pb.idx<_pb.pool.length) _pbShowQ();
+  else _pbShowResults();
+};
+
+function _pbShowResults(){
+  var s=_pb.score, t=_pb.pool.length;
+  var diff=s<=1?0:s<=3?1:2;
+  GS.difficulty=diff;
+
+  var cfgs=[
+    {label:'FOUNDATION',col:'#4dc8ff',glow:'rgba(77,200,255,.55)',ringCls:'pb-ring-fnd',
+     desc:'The module will focus on clear-cut cases to build your foundation. Chat hints are fully available.'},
+    {label:'STANDARD',col:'var(--g)',glow:'rgba(0,255,65,.55)',ringCls:'',
+     desc:'A balanced mix of clear cases and edge cases across the module.'},
+    {label:'ADVANCED',col:'var(--amb)',glow:'rgba(255,170,0,.55)',ringCls:'pb-ring-amb',
+     desc:'The module emphasises ambiguous edge cases demanding precise analysis. Minimal hints.'}
+  ];
+  var cfg=cfgs[diff];
+
+  var html=
+    '<div class="pb-hdr">PRE-BRIEF COMPLETE &mdash; '+esc(_pb.name)+'</div>'+
+    '<div class="pb-score-ring '+(cfg.ringCls)+'">'+
+    '<div class="pb-score-num">'+s+'</div>'+
+    '<div class="pb-score-denom">OUT OF '+t+'</div>'+
+    '</div>'+
+    '<div class="pb-score-sub">prerequisite knowledge check</div>'+
+    '<div class="pb-diff-badge" style="border-color:'+cfg.col+';box-shadow:0 0 18px '+cfg.glow+';">'+
+    '<div class="pb-diff-lbl">DIFFICULTY CALIBRATED TO</div>'+
+    '<div class="pb-diff-name" style="color:'+cfg.col+';text-shadow:0 0 22px '+cfg.glow+';">'+cfg.label+'</div>'+
+    '<div class="pb-diff-desc">'+cfg.desc+'</div>'+
+    '</div>'+
+    '<button class="pb-go" onclick="_pbComplete()">&#9654; PROCEED TO MISSION</button>';
+
+  var el=document.getElementById('gameModal');
+  var body=document.getElementById('gameModalBody');
+  if(el&&body){body.innerHTML=html;el.style.display='flex';}
+
+  window._pbComplete=function(){
+    var el=document.getElementById('gameModal');
+    var body=document.getElementById('gameModalBody');
+    if(el) el.style.display='none';
+    if(body) body.innerHTML='';
+    var cb=_pb.onComplete; _pb={};
+    if(cb) cb();
+  };
+}
+
 
 // ── LOAD MODULE ───────────────────────────────────────────────
 function loadModule(id){
@@ -807,835 +946,25 @@ function animGraph(data,base,cur){
   GS.gfr=requestAnimationFrame(f);
 }
 
-// ── PHISHING EXCEPTION (does NOT count as a round) ────────────
-// Large pool of varied phishing scenarios — different tells each time
-var PHISH_POOL = [
-  // Typo domains — letter swap
-  { domain:'go0gle.com',     real:'google.com',     subjects:['URGENT: Google Account Suspended','Security Alert: Unusual Sign-In','Your Google Account Needs Verification'], body:(d)=>`Dear Google User,\n\nWe detected suspicious activity on your Google account. Your account will be permanently deleted in 24 hours unless you verify your identity:\n\nhttp://accounts.${d}/verify\n\nGoogle Security Team` },
-  { domain:'micros0ft.com',  real:'microsoft.com',  subjects:['Microsoft 365: Your Licence Has Expired','Action Required: Verify Your Microsoft Account','Your OneDrive Has Been Locked'], body:(d)=>`Dear User,\n\nYour Microsoft 365 licence has expired. To avoid losing access to your files and email, please renew immediately:\n\nhttp://account.${d}/renew\n\n— Microsoft Support` },
-  { domain:'arnazon.co.uk',  real:'amazon.co.uk',   subjects:['Your Amazon Order Has Been Cancelled','Prime Membership Renewal Failed','Unusual Activity on Your Account'], body:(d)=>`Dear Customer,\n\nWe were unable to process your recent payment. Your account has been temporarily suspended. To restore access:\n\nhttp://signin.${d}/restore\n\n— Amazon` },
-  { domain:'paypa1.com',     real:'paypal.com',     subjects:['PayPal: Suspicious Activity Detected','Your PayPal Account Has Been Limited','Action Required: Confirm Your Identity'], body:(d)=>`Dear PayPal Customer,\n\nWe noticed unusual activity on your account. To protect you, we\'ve temporarily limited your account.\n\nResolve here: http://secure.${d}/resolve\n\n— PayPal Security` },
-  { domain:'netfl1x.com',    real:'netflix.com',    subjects:['Netflix: Payment Failed','Your Netflix Account Has Been Suspended','Update Your Netflix Payment Details'], body:(d)=>`Dear Member,\n\nWe were unable to process your latest payment. Your account will be suspended tonight unless you update your billing information:\n\nhttp://${d}/update-payment\n\n— Netflix` },
-  { domain:'app1e.com',      real:'apple.com',      subjects:['Apple ID: Sign-In Attempt From New Device','Your Apple ID Has Been Locked','iCloud Storage Full — Upgrade Now'], body:(d)=>`Dear Apple Customer,\n\nYour Apple ID was used to sign in from a new device in an unusual location. If this wasn\'t you, secure your account now:\n\nhttp://appleid.${d}/verify\n\n— Apple Support` },
-  { domain:'bbc-alerts.net', real:'bbc.co.uk',      subjects:['BBC: Update Your Subscription Details','BBC iPlayer: Action Required'], body:(d)=>`Dear BBC Viewer,\n\nYour BBC account requires re-verification. Please confirm your details to continue accessing BBC iPlayer:\n\nhttp://${d}/verify\n\n— BBC Team` },
-  // Completely wrong domain
-  { domain:'company.helpdesk.xyz', real:'company.com', subjects:['Your Password Expires in 1 Hour — Reset Now','URGENT: Account Access Suspended'], body:(d)=>`Dear Employee,\n\nYour network password is due to expire. To avoid being locked out, reset it immediately:\n\nhttp://${d}/password-reset\n\nIT Support` },
-  { domain:'company-portal.info',  real:'company.com', subjects:['HR: Important Update to Your Employment Record','Payroll: Direct Debit Change Required'], body:(d)=>`Dear Team Member,\n\nHR requires you to update your personal details in our system. Please log in and confirm your information by end of day:\n\nhttp://${d}/update\n\nHR Department` },
-  // CEO fraud
-  { domain:'company-ceo.net', real:'company.com', subjects:['Confidential — Please Handle Urgently','Quick Favour — Confidential'], body:(d)=>`Hi,\n\nI need your help with something urgent and confidential. I\'m in a meeting but need you to arrange a bank transfer of £6,200 to a new supplier today.\n\nPlease don\'t discuss with anyone else — reply directly to me.\n\nThanks` },
-  // Lookalike with extra characters
-  { domain:'support-paypal.com',  real:'paypal.com',   subjects:['PayPal: Please Update Your Details','Your PayPal Balance Has Been Frozen'], body:(d)=>`Dear PayPal User,\n\nYour account has an issue that requires immediate attention. Please verify your account details to avoid suspension:\n\nhttp://${d}/verify\n\n— PayPal` },
-  { domain:'amazon.customer-service.cc', real:'amazon.co.uk', subjects:['Amazon: Delivery Problem With Your Order','Your Package Could Not Be Delivered'], body:(d)=>`Dear Customer,\n\nWe attempted to deliver your parcel today but were unable to complete delivery. Please confirm your address and pay a small redelivery fee:\n\nhttp://${d}/redeliver\n\n— Amazon Delivery` },
-];
 
-function loadPhish(){
-  const tmpl = pick(PHISH_POOL);
-  const subject = pick(tmpl.subjects);
-  const body = tmpl.body(tmpl.domain);
-  // Vary the from-address format
-  const fromPrefixes = ['noreply','security','alert','support','accounts','no-reply','info','service'];
-  const sender = `${pick(fromPrefixes)}@${tmpl.domain}`;
-  const email = {id:Date.now(), sender, subject, body:body+'\n\nVerify the sender address before opening. If the domain or address looks suspicious, report it without opening.', modId:null, phish:true};
-  GS.active=true; GS.pendingEmail=email;
-  setSim('NEW MESSAGE');
-  addToInbox(email);
-  toast('New email — be careful before you act!','warn');
-}
+function loadPhish(){}  // phishing exception removed
+function loadIPTrace(){ return; }  // IP trace removed
+function startTrace(){ return; }
+function endTrace(){ return; }
+function showIPRetryModal(){ return; }
+function retryIPTrace(){ return; }
+function declineRetryIPTrace(){ return; }
+function closeIPTrace(){ return; }
+function presentHopChallenge(){ return; }
+function advanceHop(){ return; }
+function flashHop(h, f, cb){ if(cb) setTimeout(cb, 50); }
+function triggerTraceGlitch(cb){ if(cb) setTimeout(cb, 100); }
+function startMapPulse(){}
+function stopMapPulse(){}
+function startIPCountdown(){}
+function genHops(){ return []; }
+var CITIES=[];
 
-// ═══════════════════════════════════════════════════════════════
-// IP TRACE — TACTICAL MAP + PER-HOP CHALLENGES
-// Exception: does NOT count as a round
-// ═══════════════════════════════════════════════════════════════
-
-var CITIES=[
-  {city:'London',      lat:51.5,  lon:-0.12, country:'UK'},
-  {city:'Amsterdam',   lat:52.37, lon:4.89,  country:'NL'},
-  {city:'Frankfurt',   lat:50.11, lon:8.68,  country:'DE'},
-  {city:'Moscow',      lat:55.75, lon:37.62, country:'RU'},
-  {city:'Beijing',     lat:39.9,  lon:116.4, country:'CN'},
-  {city:'Seoul',       lat:37.57, lon:126.98,country:'KR'},
-  {city:'Tokyo',       lat:35.68, lon:139.69,country:'JP'},
-  {city:'São Paulo',   lat:-23.55,lon:-46.63,country:'BR'},
-  {city:'Lagos',       lat:6.52,  lon:3.37,  country:'NG'},
-  {city:'Kyiv',        lat:50.45, lon:30.52, country:'UA'},
-  {city:'Tehran',      lat:35.69, lon:51.39, country:'IR'},
-  {city:'Istanbul',    lat:41.01, lon:28.95, country:'TR'},
-  {city:'Hanoi',       lat:21.03, lon:105.83,country:'VN'},
-  {city:'Bucharest',   lat:44.43, lon:26.1,  country:'RO'},
-  {city:'Nairobi',     lat:-1.29, lon:36.82, country:'KE'},
-  {city:'Buenos Aires',lat:-34.6, lon:-58.38,country:'AR'},
-  {city:'Dubai',       lat:25.2,  lon:55.27, country:'UAE'},
-  {city:'Sydney',      lat:-33.87,lon:151.21,country:'AU'},
-  {city:'Chicago',     lat:41.88, lon:-87.63,country:'US'},
-  {city:'Johannesburg',lat:-26.2, lon:28.04, country:'ZA'},
-];
-
-// ─────────────────────────────────────────────────────────────────────
-// TACTICAL MAP — 2D equirectangular projection radar-style display
-// Nothing ever goes off-screen. IP always shown in fixed panel.
-// ─────────────────────────────────────────────────────────────────────
-
-// Continent polygons as [lon, lat] pairs for equirectangular projection
-
-
-function presentHopChallenge(hopIdx){
-  try{SFX.sonar();}catch(ex){}
-  var s=GS.ip; if(!s||s.done)return;
-  var hop=s.hops[hopIdx];
-  if(!hop||!hop.options||!hop.options.length){
-    // Guard failed — auto-advance rather than hang
-    setTimeout(function(){ if(!s.done) advanceHop(); }, 500);
-    return;
-  }
-  s.waitingForAnswer=true;
-  s.currentChallengeHop=hopIdx;
-  s.hopStartTime=Date.now();
-  var isFinal=(hopIdx===s.hops.length-1);
-
-  // Update location display
-  var ipEl=document.getElementById('ipCurrentIP');
-  var cityEl=document.getElementById('ipCurrentCity');
-  if(ipEl)  ipEl.textContent=hop.ip;
-  if(cityEl)cityEl.textContent='📍 '+hop.city+', '+hop.country;
-
-  // HIDE THE MAP to make space for the question on small screens
-  var mapWrap=document.getElementById('ipMapWrap');
-  if(mapWrap) mapWrap.style.display='none';
-
-  // Build question HTML in the ipEasyOpts container
-  var opts=document.getElementById('ipEasyOpts');
-  if(!opts) return;
-  opts.innerHTML='';
-  opts.style.cssText='display:block;width:100%;';
-
-  // Hop label
-  var label=document.createElement('div');
-  label.style.cssText='font-size:10px;letter-spacing:.12em;color:rgba(0,255,65,.45);margin-bottom:8px;';
-  label.textContent=(isFinal?'⚠ ORIGIN NODE — FINAL ANALYSIS':'HOP '+(hopIdx+1)+'/'+s.hops.length+' — '+hop.city+', '+hop.country);
-  opts.appendChild(label);
-
-  // Context
-  var ctx=document.createElement('div');
-  ctx.style.cssText='font-size:11px;color:rgba(0,255,65,.6);font-style:italic;margin-bottom:8px;line-height:1.5;';
-  ctx.textContent=hop.context;
-  opts.appendChild(ctx);
-
-  // Question
-  var qEl=document.createElement('div');
-  qEl.style.cssText='font-size:13px;color:#00ff99;font-weight:600;line-height:1.4;margin-bottom:10px;';
-  qEl.textContent=hop.question;
-  opts.appendChild(qEl);
-
-  // Answer buttons — addEventListener, NOT onclick attribute
-  hop.options.forEach(function(optText, idx){
-    var btn=document.createElement('button');
-    btn.style.cssText='display:block;width:100%;padding:10px 12px;margin-bottom:8px;'
-      +'background:rgba(0,255,65,.06);border:1px solid rgba(0,255,65,.3);border-radius:5px;'
-      +'color:rgba(0,255,65,.85);font-size:12px;line-height:1.4;text-align:left;cursor:pointer;'
-      +'font-family:inherit;-webkit-appearance:none;';
-    btn.textContent=optText;
-    btn.addEventListener('click', function(){
-      // Disable all buttons immediately to prevent double-fire
-      var allBtns=opts.querySelectorAll('button');
-      allBtns.forEach(function(b){ b.disabled=true; });
-      // Show map again
-      if(mapWrap) mapWrap.style.display='';
-      handleHopAnswer(idx===hop.correct, hop, isFinal);
-    });
-    opts.appendChild(btn);
-  });
-}
-
-
-function handleHopAnswer(correct,hop,isFinal){
-  stopMapPulse();
-  // Defensive clear — guard against null in case of timing edge cases
-  var optsEl=document.getElementById('ipEasyOpts');
-  if(optsEl) optsEl.innerHTML='';
-  const s=GS.ip;
-  const elapsed=Date.now()-(s.hopStartTime||0);
-
-  if(!correct){
-    clearInterval(s.ti);
-    if(TRACER.animId){cancelAnimationFrame(TRACER.animId);TRACER.animId=null;}
-    try{SFX.bgStop();}catch(ex){}
-    // Include correct answer directly in the modal — no DOM manipulation, no timeout
-    var correctText=(hop.options&&hop.correct!=null)?hop.options[hop.correct]:'';
-    var answerBlock=correctText
-      ? '<div style="background:rgba(0,255,65,.06);border:1px solid rgba(0,255,65,.3);border-radius:5px;padding:10px 12px;margin:10px 0 16px;font-size:11px;color:rgba(0,255,65,.85);line-height:1.5;text-align:left;"><span style="display:block;font-size:9px;letter-spacing:.12em;color:rgba(0,255,65,.45);margin-bottom:5px;">CORRECT ANSWER</span>'+esc(correctText)+'</div>'
-      : '';
-    if(!s.usedRetry){
-      var html='<div class="gm-flash" style="color:var(--red)">&#10007; INCORRECT</div>'
-              +'<div class="gm-title" style="margin-bottom:4px;">Wrong answer for <strong>'+esc(hop.city)+'</strong> relay.</div>'
-              +answerBlock
-              +'<div style="display:flex;gap:10px;">'
-              +'<button class="btn btn-g btn-orb gm-ok" id="gameModalOk" style="flex:1">&#8635; RETRY TRACE (45s)</button>'
-              +'<button class="btn btn-sm btn-d" id="ipGiveUp" style="flex:1">ABANDON TRACE</button>'
-              +'</div>';
-      showGameModal(html, function(){ retryIPTrace(); });
-      setTimeout(function(){
-        var g=document.getElementById('ipGiveUp');
-        if(g) g.onclick=function(){
-          var el=gameModalEl(); if(el) el.style.display='none';
-          var body=document.getElementById('gameModalBody'); if(body) body.innerHTML='';
-          declineRetryIPTrace();
-        };
-      },0);
-    } else {
-      endTrace(false,'Incorrect analysis for '+hop.city+' relay.');
-    }
-    return;
-  }
-
-  s.waitingForAnswer=false;
-  try{SFX.correct();}catch(ex){}
-
-  if(isFinal){
-    clearInterval(s.ti);
-    try{SFX.bgStop();}catch(ex){}
-    endTrace(true,'');
-  } else {
-    // Check if we should add more hops (student doing well, about to finish early)
-    const hopsLeft = s.hops.length - 1 - s.cur;
-    if(s.timer > 28 && hopsLeft <= 1 && s.hops.length < 10){
-      const extras = genHops(2);
-      s.hops.push(...extras);
-      // Re-mark last 2 as hard
-      s.hops.forEach((h,i) => { h.hard = i >= s.hops.length - 2; });
-      gcMsg('priya',`Attacker detected the trace — proxy chain extended to ${s.hops.length} relay nodes.`,200);
-      gcMsg('marcus',`Route extended to ${s.hops.length} hops. Maintain the trace — compare each IP carefully.`,900);
-    }
-    if(elapsed<6000){
-      triggerTraceGlitch(()=>advanceHop());
-    } else {
-      document.getElementById('ipStat').textContent='✓ Relay confirmed — advancing trace…';
-      setTimeout(()=>advanceHop(),400);
-    }
-  }
-}
-
-// Glitch effect — fires when child answers too quickly (under 2s)
-// Story: the hacker spotted them and tried to throw off the trace
-function triggerTraceGlitch(onResume){
-  const statEl=document.getElementById('ipStat');
-  const cityEl=document.getElementById('ipCurrentCity');
-  const ipEl  =document.getElementById('ipCurrentIP');
-  const duration=2500+Math.random()*1500; // 2.5–4 seconds
-
-  statEl.style.color='var(--amb)';
-  statEl.textContent='⚡ COUNTER-TRACE DETECTED — SIGNAL INTERRUPTED';
-  cityEl.textContent='RE-ESTABLISHING SIGNAL…';
-  try{SFX.alert();}catch(e){}
-
-  // Rapidly flash scrambled IPs and messages
-  let tick=0;
-  const glitchInt=setInterval(()=>{
-    tick++;
-    ipEl.textContent = tick%2===0 ? '????.????' : rndIP();
-    cityEl.textContent=tick%2===0 ? 'RE-ESTABLISHING…' : 'DECOY NODE DETECTED…';
-  },280);
-
-  setTimeout(()=>{
-    clearInterval(glitchInt);
-    statEl.style.color='';
-    statEl.textContent='SIGNAL RESTORED — CONTINUING TRACE';
-    cityEl.textContent='TRACE RE-ESTABLISHED';
-    ipEl.textContent='—';
-    setTimeout(()=>onResume(),600);
-  },duration);
-}
-
-// ══════════════════════════════════════════════════════════════
-// NEON CANVAS MAP — IP Trace
-// ══════════════════════════════════════════════════════════════
-
-// Simplified continent polygons [lon, lat] — enough detail to be
-// recognisable, not so much they slow down canvas rendering
-
-// ── NEON MAP — self-contained, no external dependencies ──────
-var TRACER = { animId: null };
-
-function mapProj(lat, lon, w, h) {
-  return { x: ((lon + 180) / 360) * w, y: ((90 - lat) / 180) * h };
-}
-
-function resizeMapCanvas(cv) {
-  // Lock to the SVG viewBox (720x360) so canvas dots align exactly with the
-  // SVG continents. The canvas is stretched by CSS to fill the wrapper, exactly
-  // like the SVG (preserveAspectRatio=none), so both share one coordinate space.
-  if (cv.width !== 720 || cv.height !== 360) { cv.width = 720; cv.height = 360; }
-}
-
-function drawNeonMap(cv, trail, currentHop){
-  try{
-    var ctx=cv.getContext('2d');
-    var w=cv.width||720, h=cv.height||360;
-    // Everything drawn on ONE canvas — continents AND dots share the same
-    // coordinate system, so they can never be out of alignment.
-    ctx.fillStyle='#010d03'; ctx.fillRect(0,0,w,h);
-    // Simple recognisable continent blobs [lon,lat] → canvas
-    var P=function(lat,lon){return {x:((lon+180)/360)*w, y:((90-lat)/180)*h};};
-    var blobs=[
-      // North America
-      [[72,-160],[60,-165],[48,-125],[30,-115],[16,-92],[9,-80],[25,-80],[45,-65],[60,-65],[72,-95]],
-      // South America
-      [[10,-78],[5,-50],[-10,-37],[-23,-43],[-40,-62],[-54,-68],[-40,-73],[-18,-70],[0,-80]],
-      // Europe
-      [[38,-9],[44,0],[40,18],[38,28],[55,28],[70,20],[60,5],[44,-9]],
-      // Africa
-      [[16,-18],[5,5],[12,42],[12,51],[-12,40],[-35,20],[-35,12],[-5,-15],[16,-18]],
-      // Asia
-      [[70,30],[72,90],[68,140],[20,120],[2,104],[8,78],[22,60],[42,38],[60,30]],
-      // Australia
-      [[-12,130],[-20,150],[-38,148],[-35,115],[-22,114]],
-      // UK
-      [[50,-6],[58,-2],[58,-6],[52,-8]],
-      // Greenland
-      [[77,-50],[82,-30],[72,-22],[68,-45]],
-      // Japan
-      [[34,135],[42,141],[36,138]],
-    ];
-    ctx.lineWidth=1.4; ctx.strokeStyle='#00cc33'; ctx.fillStyle='rgba(0,42,8,0.85)';
-    ctx.shadowColor='#00ff41'; ctx.shadowBlur=5;
-    blobs.forEach(function(poly){
-      ctx.beginPath();
-      poly.forEach(function(pt,idx){var p=P(pt[0],pt[1]); idx===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y);});
-      ctx.closePath(); ctx.fill(); ctx.stroke();
-    });
-    ctx.shadowBlur=0;
-    // Trail
-    if(trail&&trail.length>1){
-      ctx.setLineDash([6,4]); ctx.strokeStyle='rgba(255,100,0,0.6)'; ctx.lineWidth=1.6;
-      ctx.beginPath();
-      trail.forEach(function(hop,idx){var p=P(hop.lat,hop.lon); idx===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y);});
-      ctx.stroke(); ctx.setLineDash([]);
-      for(var k=0;k<trail.length-1;k++){
-        var pv=P(trail[k].lat,trail[k].lon);
-        ctx.beginPath(); ctx.arc(pv.x,pv.y,5,0,Math.PI*2);
-        ctx.fillStyle='#ff6600'; ctx.shadowColor='#ff4400'; ctx.shadowBlur=10; ctx.fill(); ctx.shadowBlur=0;
-      }
-    }
-    // Active hop with pulsing rings
-    if(currentHop){
-      var p=P(currentHop.lat,currentHop.lon);
-      var t=Date.now()/500;
-      for(var r=0;r<3;r++){
-        var rad=10+r*12+Math.sin(t+r*1.2)*4;
-        ctx.beginPath(); ctx.arc(p.x,p.y,rad,0,Math.PI*2);
-        ctx.strokeStyle='rgba(255,50,0,'+(0.4-r*0.12)+')'; ctx.lineWidth=1.5;
-        ctx.shadowColor='#ff3300'; ctx.shadowBlur=8; ctx.stroke();
-      }
-      ctx.beginPath(); ctx.arc(p.x,p.y,7,0,Math.PI*2);
-      ctx.fillStyle='#ff3300'; ctx.shadowColor='#ff3300'; ctx.shadowBlur=24; ctx.fill(); ctx.shadowBlur=0;
-      ctx.font='bold 11px monospace'; ctx.fillStyle='rgba(255,210,190,0.95)';
-      ctx.fillText(currentHop.city, p.x+11, p.y+4);
-    }
-  }catch(e){console.warn('Map draw error:',e);}
-}
-
-
-
-function drawTacticalMapIdle(){
-  const cv = document.getElementById('ipMapCanvas'); if(!cv) return;
-  resizeMapCanvas(cv); drawNeonMap(cv, [], null);
-  TRACER.animId = requestAnimationFrame(drawTacticalMapIdle);
-}
-
-// ── FLASH HOP ─────────────────────────────────────────────────
-function flashHop(hop, first, onDone){
-  // Always cancel any running animation first
-  if(TRACER.animId){ cancelAnimationFrame(TRACER.animId); TRACER.animId=null; }
-
-  const cv=document.getElementById('ipMapCanvas');
-  if(!cv){ if(onDone)setTimeout(onDone,50); return; }
-
-  resizeMapCanvas(cv);
-  const s=GS.ip;
-
-  // Update info text immediately
-  document.getElementById('ipCurrentIP').textContent=hop.ip;
-  document.getElementById('ipCurrentCity').textContent='📍 '+hop.city+', '+hop.country;
-  try{SFX.sonar();}catch(e){}
-
-  // Draw map with this hop shown
-  const trail=s.hops?s.hops.slice(0,Math.max(0,s.cur)+1):[];
-  drawNeonMap(cv,trail,hop);
-
-  // Store position for next hop's trail line
-  const to=mapProj(hop.lat,hop.lon,cv.width||680,cv.height||240);
-  s.prevX=to.x; s.prevY=to.y;
-
-  // One-frame delay so browser paints before presenting the challenge
-  setTimeout(function(){ if(onDone)onDone(); },150);
-}
-
-// ── MAP PULSE (during answer phase) ──────────────────────────
-var _mapPulseId = null;
-function startMapPulse(){
-  if(_mapPulseId) return;
-  function pulse(){
-    const cv = document.getElementById('ipMapCanvas'); if(!cv){ _mapPulseId = null; return; }
-    resizeMapCanvas(cv);
-    const s = GS.ip;
-    const trail = s && s.hops ? s.hops.slice(0, Math.max(0, (s.cur || 0) + 1)) : [];
-    const cur   = s && s.hops && s.cur >= 0 ? s.hops[s.cur] : null;
-    drawNeonMap(cv, trail, cur);
-    _mapPulseId = requestAnimationFrame(pulse);
-  }
-  _mapPulseId = requestAnimationFrame(pulse);
-}
-function stopMapPulse(){
-  if(_mapPulseId){ cancelAnimationFrame(_mapPulseId); _mapPulseId = null; }
-}
-
-// ── START TRACE ───────────────────────────────────────────────
-function startTrace(){
-  document.getElementById('ipMode').style.display='none';
-  document.getElementById('ipTrace').style.display='';
-  document.getElementById('ipEasyOpts').style.display='none';
-  document.getElementById('ipStat').textContent='';
-  document.getElementById('ipCurrentIP').textContent='';
-  document.getElementById('ipCurrentCity').textContent='Initialising trace…';
-
-  const hopCount = Math.max(5, GS.maxH<=1?8:GS.maxH<=2?7:GS.maxH<=3?6:5);
-  const hops = genHops(hopCount);
-  GS.ip = { hops, cur:-1, timer:60, done:false, ti:null,
-            waitingForAnswer:false, currentChallengeHop:null,
-            prevX:null, prevY:null, usedRetry:false };
-
-  document.getElementById('ipTimer').textContent='60';
-  document.getElementById('ipTimer').classList.remove('danger');
-  try{ SFX.bgStart(); }catch(ex){}
-
-  document.getElementById('ipCurrentCity').textContent='Trace initiating — 5 seconds…';
-  let cd = 5;
-  const cdInt = setInterval(()=>{
-    cd--; try{ SFX.tick(); }catch(ex){}
-    if(cd > 0){
-      document.getElementById('ipCurrentCity').textContent='Initiating in ' + cd + '…';
-    } else {
-      clearInterval(cdInt);
-      startIPCountdown();
-      GS.ip.cur = 0;
-      flashHop(hops[0], true, ()=>{
-        document.getElementById('ipHopInfo').textContent='HOP 1/'+hops.length+' — '+hops[0].city+', '+hops[0].country;
-        presentHopChallenge(0);
-      });
-    }
-  }, 1000);
-}
-
-function startIPCountdown(){
-  const s = GS.ip;
-  s.ti = setInterval(()=>{
-    s.timer--;
-    const el = document.getElementById('ipTimer');
-    el.textContent = s.timer;
-    if(s.timer <= 15){ el.classList.add('danger'); try{ SFX.tick(); }catch(ex){} }
-    if(s.timer === 15){ try{ SFX.bgIntensify(); }catch(ex){} }
-    if(s.timer <= 0){ clearInterval(s.ti); endTrace(false,'Time ran out!'); }
-  }, 1000);
-}
-
-function advanceHop(){
-  const s = GS.ip; if(s.done || s.cur >= s.hops.length - 1) return;
-  s.cur++;
-  const hop = s.hops[s.cur];
-  flashHop(hop, false, ()=>{
-    document.getElementById('ipHopInfo').textContent='HOP '+(s.cur+1)+'/'+s.hops.length+' — '+hop.city+', '+hop.country;
-    const pool = IP_TRACE_CHAT.onHop;
-    if(pool){ const e = pick(pool); gcMsg(e.persona, pick(e.msgs)); }
-    presentHopChallenge(s.cur);
-  });
-}
-
-function rndIP(){return `${randInt(2,220)}.${randInt(0,254)}.${randInt(0,254)}.${randInt(1,254)}`;}
-
-function loadIPTrace(){
-  try{SFX.alert();}catch(e){}
-  document.body.classList.add('alert-mode');setSim('🔴 INTRUSION DETECTED');
-  GS.active=true;
-  try{const e1=pick(IP_TRACE_CHAT.onStart);gcMsg(e1.persona,pick(e1.msgs),400);}catch(e){}
-  try{setTimeout(()=>{const e2=pick(IP_TRACE_CHAT.onStart);gcMsg(e2.persona,pick(e2.msgs));},3200);}catch(e){}
-  document.getElementById('ipMode').style.display='';
-  document.getElementById('ipTrace').style.display='none';
-  document.getElementById('ipResult').style.display='none';
-  document.getElementById('ipOverlay').classList.add('open');
-  // Initialise the neon canvas map
-  drawTacticalMapIdle();
-}
-
-function endTrace(won,reason){
-  const s=GS.ip;if(s.done)return;s.done=true;
-  clearInterval(s.ti); // hopInt removed — only the countdown timer to clear
-  stopMapPulse();if(TRACER.animId){cancelAnimationFrame(TRACER.animId);TRACER.animId=null;}
-  try{SFX.bgStop();}catch(ex){}
-  document.getElementById('ipTrace').style.display='none';
-  document.getElementById('ipResult').style.display='';
-  if(won){
-    try{SFX.win();}catch(ex){}/*vox*/addXP(50);GS.ipWon=true;
-    document.getElementById('ipResultInner').innerHTML=`<div class="iprwin">✓ TRACE COMPLETE — SOURCE IDENTIFIED</div><div class="iprsub">All relay nodes confirmed. Attack source isolated and blocked.</div>`;
-    const e=pick(IP_TRACE_CHAT.onWin);gcMsg(e.persona,pick(e.msgs),600);
-  } else {
-    try{SFX.lose();}catch(ex){}/*vox*/
-    document.getElementById('ipResultInner').innerHTML=`<div class="iprlose">✗ TRACE FAILED</div><div class="iprsub">${esc(reason||'The attacker routed beyond the trace window.')}<br>Review the relay sequence and retry.</div>`;
-    const e=pick(IP_TRACE_CHAT.onLose);gcMsg(e.persona,pick(e.msgs),600);
-  }
-}
-
-// ── RETRY MODAL — one second chance per trace ──────────────────
-function showIPRetryModal(reason){
-  // Use the unified game modal — no dependency on a separate retry modal element
-  var html='<div class="gm-flash" style="color:var(--red)">&#9888; TRACE INTERRUPTED</div>'
-          +'<div class="gm-title" style="margin-bottom:18px">'+esc(reason)+'</div>'
-          +'<div style="display:flex;gap:10px;">'
-          +'<button class="btn btn-g btn-orb gm-ok" id="gameModalOk" style="flex:1">↺ RETRY TRACE (45s)</button>'
-          +'<button class="btn btn-sm btn-d" id="ipGiveUp" style="flex:1">ABANDON TRACE</button>'
-          +'</div>';
-  showGameModal(html, function(){ retryIPTrace(); });
-  // Wire give-up separately
-  setTimeout(function(){
-    var g=document.getElementById('ipGiveUp');
-    if(g)g.onclick=function(){
-      var el=gameModalEl(); if(el)el.style.display='none';
-      var body=document.getElementById('gameModalBody'); if(body)body.innerHTML='';
-      declineRetryIPTrace();
-    };
-  },0);
-}
-
-function retryIPTrace(){
-  const s=GS.ip; if(!s)return;
-  s.usedRetry=true; s.done=false;
-  // Restart with same hop count but fresh hops and 45 seconds
-  const hopCount=s.hops.length;
-  const newHops=genHops(hopCount);
-  s.hops=newHops; s.cur=-1;
-  s.timer=45; s.waitingForAnswer=false;
-  document.getElementById('ipTimer').textContent='45';
-  document.getElementById('ipTimer').classList.remove('danger');
-  document.getElementById('ipTrace').style.display='';
-  document.getElementById('ipResult').style.display='none';
-  try{SFX.bgStart();}catch(ex){}
-  // Restart the idle map animation (was cancelled when wrong answer was given)
-  drawTacticalMapIdle();
-  startIPCountdown();
-  gcMsg('zara','Retry authorised — 45 seconds. Read each question carefully before answering.',200);
-  gcMsg('marcus','There is only one correct answer per question. Take your time — the timer is reset.',800);
-  setTimeout(()=>advanceHop(),2000);
-}
-
-function declineRetryIPTrace(){
-  const s=GS.ip; if(!s)return;
-  s.usedRetry=true;
-  endTrace(false,'Trace abandoned.');
-}
-
-function closeIPTrace(){
-  /*vox*/stopMapPulse();if(TRACER.animId){cancelAnimationFrame(TRACER.animId);TRACER.animId=null;}
-  try{SFX.bgStop();}catch(ex){}
-  document.getElementById('ipOverlay').classList.remove('open');
-  document.body.classList.remove('alert-mode');
-  GS.active=false;setSim('READY');setStep(0);clearGlows();
-  document.getElementById('btnRefresh').classList.add('pulse-glow');
-  schedAutoAdvance(12000);
-}
-
-// ── IP TRACE HOP QUESTION GENERATOR ─────────────────────────
-function genHops(n){
-  // Questions defined locally — no global initialisation required
-  var QS = [
-    { c:"WHOIS: This IP belongs to a commercial VPN provider (Mullvad, ASN 39351). The server handles hundreds of simultaneous client connections.",
-      q:"What role is this node playing in the attacker's infrastructure?",
-      opts:["The attacker personally owns this server",
-            "A shared commercial VPN exit — many users share this IP, making individual attribution difficult without legal cooperation",
-            "A government surveillance server — VPNs register with national authorities"],
-      ok:1 },
-    { c:"This IP appears in the Tor Project's published exit node list. It operates on ports 9001 and 9030 and handles thousands of relayed connections per hour.",
-      q:"What does this tell you about the attacker's technique?",
-      opts:["The attacker is physically located in this country — Tor nodes are operated by local residents",
-            "The attacker is routing through a Tor exit node — their real IP is earlier in the chain, not visible at this hop",
-            "This is the attacker's home router, registered with Tor to appear legitimate"],
-      ok:1 },
-    { c:"This IP belongs to a UK residential ISP (Virgin Media). Logs show scheduled outbound connections at 03:00 daily with no user-initiated activity.",
-      q:"What is the most likely forensic explanation?",
-      opts:["A compromised residential machine used as a relay node — botnet-infected home PCs are common proxy hops because they look like ordinary users",
-            "A night-shift remote worker using home broadband",
-            "Virgin Media routing all customer traffic through a shared address"],
-      ok:0 },
-    { c:"Shodan shows this IP is running an unauthenticated open HTTP proxy on port 8080. The server owner appears unaware of this.",
-      q:"Why would an attacker route through this node?",
-      opts:["Open proxies are faster than VPNs for attack traffic",
-            "Open proxies encrypt all traffic end-to-end, preventing interception",
-            "Using a third party's misconfigured server adds indirection — the owner has no knowledge it is being used, and there are no attacker credentials logged"],
-      ok:2 },
-    { c:"The trace has crossed 6 relay nodes across 5 different countries to reach this hop.",
-      q:"Why would an attacker deliberately chain proxies across multiple countries?",
-      opts:["To increase connection speed by distributing load",
-            "To make attribution harder — recovering the full chain requires legal cooperation from every jurisdiction, most of which will not respond in time",
-            "Each proxy automatically adds an encryption layer to the data"],
-      ok:1 },
-    { c:"This IP was provisioned on Amazon Web Services 4 hours ago. The attacker's traffic used it for 90 minutes, then the instance was terminated.",
-      q:"What technique is this, and why is it effective against forensic investigation?",
-      opts:["Ephemeral cloud infrastructure — short-lived instances leave minimal forensic trace and are destroyed before investigators can image them",
-            "Cloud bandwidth amplification — AWS automatically boosts attack throughput",
-            "Server hijacking — the attacker compromised an existing AWS customer's machine"],
-      ok:0 },
-    { c:"This is the final relay hop. The IP geolocates to a data centre in Frankfurt. A colleague says: the attacker is based in Frankfurt.",
-      q:"What is wrong with this conclusion?",
-      opts:["Nothing — if the last IP is in Frankfurt, the attacker is there",
-            "Frankfurt data centres never host attackers — this is a false positive",
-            "This is the last relay, not the origin — the attacker's real location is the unidentified source that used this relay, which may itself be another proxy"],
-      ok:2 },
-    { c:"The trace documents 7 hops. An analyst presents the final IP as definitive proof of the attacker's nationality.",
-      q:"What is the most significant forensic limitation of this claim?",
-      opts:["Traces over 3 hops are legally inadmissible as forensic evidence",
-            "The origin IP may itself be a compromised machine — IP attribution across multi-hop chains is probabilistic, not certain, and requires corroborating evidence",
-            "Digital forensics is never admissible in court"],
-      ok:1 },
-    { c:"Network forensics identifies this as a Tor guard node — the first hop in a Tor circuit. The attacker connected to Tor from a source before this.",
-      q:"Can the investigation trace beyond this Tor guard node?",
-      opts:["Only with legal authority and operator cooperation — guard nodes do not log client IPs accessibly, and Tor separates origin and destination knowledge across different nodes",
-            "Yes — Tor guard nodes keep 30-day connection logs",
-            "Yes — the attacker's real IP is in the Tor Project's public node directory"],
-      ok:0 },
-    { c:"The trace leads to a UK ISP-assigned IP. The ISP holds subscriber records that would identify the account holder.",
-      q:"What is the correct next investigative step?",
-      opts:["Request records immediately — public IPs require no legal process",
-            "The investigation ends here — UK ISPs cannot cooperate with cybercrime investigations",
-            "Obtain a legal order (court order or production order) — subscriber data is personal information that UK ISPs cannot lawfully disclose without legal authority"],
-      ok:2 },
-    { c:"Packet timestamps show the attacker's traffic entered the first relay at 14:32:07.003 UTC and exits the final relay at 14:32:07.891 UTC — 888ms across 6 hops.",
-      q:"What forensic technique could use this timing data?",
-      opts:["Nothing — packet timestamps are too imprecise to be useful",
-            "Traffic correlation — monitoring both entry and exit simultaneously allows linking sender to receiver by timing patterns, even without decrypting content",
-            "Packet injection — the 888ms gap allows inserting forged packets"],
-      ok:1 },
-    { c:"Trace complete. The origin IP is identified. The incident response team asks: can we be certain this is the attacker?",
-      q:"What is the correct forensic answer?",
-      opts:["Yes — all hops were verified, the origin IP is certain",
-            "No — IP addresses are legally inadmissible, never usable as evidence",
-            "Likely, but attribution requires corroborating evidence — account logs, malware samples, TTPs. The origin device may itself be compromised."],
-      ok:2 },
-  ];
-
-  // Shuffle question pool
-  var pool = QS.slice();
-  for(var pi=pool.length-1;pi>0;pi--){var pj=Math.floor(Math.random()*(pi+1));var pt=pool[pi];pool[pi]=pool[pj];pool[pj]=pt;}
-
-  // Build hops
-  var cityPool = CITIES.slice();
-  for(var ci=cityPool.length-1;ci>0;ci--){var cj=Math.floor(Math.random()*(ci+1));var ct=cityPool[ci];cityPool[ci]=cityPool[cj];cityPool[cj]=ct;}
-  var selected = cityPool.slice(0, Math.min(n, cityPool.length));
-
-  return selected.map(function(city, i){
-    var q = pool[i % pool.length];
-    // Shuffle this question's options
-    var opts = q.opts.map(function(text, idx){ return {text:text, isRight:(idx===q.ok)}; });
-    for(var oi=opts.length-1;oi>0;oi--){var oj=Math.floor(Math.random()*(oi+1));var ot=opts[oi];opts[oi]=opts[oj];opts[oj]=ot;}
-    var rightIdx = opts.findIndex(function(o){ return o.isRight; });
-    return {
-      city:    city.city,
-      country: city.country,
-      lat:     city.lat,
-      lon:     city.lon,
-      ip:      randInt(2,220)+'.'+randInt(0,254)+'.'+randInt(0,254)+'.'+randInt(1,254),
-      hard:    i >= selected.length - 2,
-      context: q.c,
-      question:q.q,
-      options: opts.map(function(o){ return o.text; }),
-      correct: rightIdx,
-    };
-  });
-}
-
-
-// ── CHAT ──────────────────────────────────────────────────────
-function gcMsg(pId,msg,delay=0){
-  const p=PERSONAS[pId];if(!p||!msg)return;
-  setTimeout(()=>{
-    const now=new Date(),t=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-    const w=document.createElement('div');w.className='cmsg p'+pId;
-    w.innerHTML=`<div class="chdr"><span class="cname">${p.name}</span><span class="ctime">${t}</span></div><div class="cbub">${esc(msg)}</div>`;
-    const box=document.getElementById('chatMsgs');box.appendChild(w);box.scrollTop=box.scrollHeight;
-    try{SFX.chatPing();}catch(e){}
-    /*vox*/
-  },delay);
-}
-
-// ── 2-PART MODULE LOAD CHAT (slow — one message, then one 4s later) ──
-function gcModLoad(modId){
-  const chat=MODULE_GROUP_CHAT[modId];if(!chat)return;
-  // Message 1: heads up (immediate)
-  const e1=pick(chat.onLoad_1||[]);if(e1)gcMsg(e1.persona,pick(e1.msgs),500);
-  // Message 2: where to start (4 seconds later)
-  const e2=pick(chat.onLoad_2||[]);if(e2)gcMsg(e2.persona,pick(e2.msgs),5000);
-}
-
-// ── gcMod: module-specific first, falls back to GLOBAL_CHAT pool ──
-function gcMod(modId,key,delay=400){
-  const chat=MODULE_GROUP_CHAT[modId];
-  // Try module-specific key first
-  if(chat&&chat[key]){
-    const e=pick(chat[key]);
-    if(e)gcMsg(e.persona,pick(e.msgs),delay);
-    return;
-  }
-  // Fall back to global pool
-  const pool=GLOBAL_CHAT[key];
-  if(!pool)return;
-  const e=pick(pool);
-  if(e)gcMsg(e.persona,pick(e.msgs),delay);
-}
-
-// ── SC BRIDGE REMOVED — stubs in setStep section ───────────────
-
-// ── PLENARY MODAL ─────────────────────────────────────────────
-function showPlenary(savedId,savedScenario){
-  const mod=MODULES[savedId];if(!mod||!mod.plenary)return schedAutoAdvance(20000);
-  const pl=mod.plenary;
-  const allClear=savedScenario&&savedScenario.every(s=>s.ragAnswer==='G');
-  const narrators=['Marcus:','Priya:','Zara:','The team:'];
-
-  document.getElementById('plenTitle').textContent='🔍 DEBRIEF — '+mod.name;
-  // Reset phase state
-  document.getElementById('plenPhase1').style.display='block';
-  document.getElementById('plenPhase2').style.display='none';
-  document.getElementById('plenToQuiz').style.display='none';
-  document.getElementById('plenContinue').style.display='none';
-
-  // ── Phase 1: debrief content ──────────────────────────────
-  let html=`<div style="font-size:12px;color:rgba(0,255,65,.4);margin-bottom:12px;">${pick(narrators)}</div>`;
-  if(pl.analogy){html+=`<div class="plen-analogy">${pl.analogy}</div>`;}
-  if(pl.whatHappened){html+=`<div class="plen-fact"><span class="plen-icon">⚡</span><span>${pl.whatHappened}</span></div>`;}
-  if(pl.keyMove){html+=`<div class="plen-fact"><span class="plen-icon">🎯</span><span>${pl.keyMove}</span></div>`;}
-  if(pl.realWorld){html+=`<div class="plen-fact"><span class="plen-icon">🏠</span><span>${pl.realWorld}</span></div>`;}
-  document.getElementById('plenContent').innerHTML=html;
-
-  // ── Report question (suppressed if all-clear) ─────────────
-  if(allClear){
-    GS.plenReportDone=true;
-    document.getElementById('plenReport').innerHTML=
-      `<div class="plen-allclear">✅ All clear — no threats found, no report needed!</div>`;
-    document.getElementById('plenToQuiz').style.display='block';
-  } else {
-    const teams=shuffle([mod.reportTeams.correct,mod.reportTeams.incorrect]);
-    const hint=mod.reportHint||'Think about what type of attack this was.';
-    let rHtml=`<div class="plen-report-q">
-      <div class="pq-q">📋 Who gets this report?</div>
-      <div class="pq-hint">${esc(hint)}</div>
-      <div class="pq-opts">`;
-    teams.forEach(t=>{
-      rHtml+=`<button class="pq-opt pq-report-opt" data-team="${escA(t)}" onclick="plenReport('${escA(t)}','${escA(mod.reportTeams.correct)}','${escA(savedId)}')">${esc(t)}</button>`;
-    });
-    rHtml+=`</div><div class="pq-result" id="pqr_report"></div></div>`;
-    document.getElementById('plenReport').innerHTML=rHtml;
-  }
-
-  // ── Phase 2: quiz (built now, hidden until phase 2 shown) ─
-  const quizPool=(()=>{
-    if(!pl.quiz||!pl.quiz.length) return [];
-    if(!SESSION_HISTORY.quizShown[savedId]) SESSION_HISTORY.quizShown[savedId]=new Set();
-    const seen=SESSION_HISTORY.quizShown[savedId];
-    const allIdx=pl.quiz.map((_,i)=>i);
-    const unseen=allIdx.filter(i=>!seen.has(i));
-    const pool=unseen.length>=2?unseen:allIdx; // reset if all questions seen
-    const picked=shuffle(pool).slice(0,2);
-    picked.forEach(i=>seen.add(i));
-    // Shuffle each question's option ORDER too — otherwise the correct
-    // answer sits in the same position every time (a guessable pattern).
-    // We build a fresh object so the original quiz data is never mutated.
-    return picked.map(i=>{
-      const orig=pl.quiz[i];
-      const order=orig.options.map((_,idx)=>idx);
-      const shuffledOrder=shuffle(order);
-      const newOptions=shuffledOrder.map(idx=>orig.options[idx]);
-      const newCorrect=shuffledOrder.indexOf(orig.correct);
-      return {q:orig.q, options:newOptions, correct:newCorrect};
-    });
-  })();
-  if(quizPool.length){
-    GS.plenQuizTotal=quizPool.length;
-    let qHtml='';
-    quizPool.forEach((q,qi)=>{
-      qHtml+=`<div class="pq" id="pq${qi}"><div class="pq-q">${q.q}</div><div class="pq-opts">`;
-      q.options.forEach((opt,oi)=>{
-        qHtml+=`<button class="pq-opt" id="pqo${qi}_${oi}" onclick="plenAnswer(${qi},${oi},${q.correct})">${esc(opt)}</button>`;
-      });
-      qHtml+=`</div><div class="pq-result" id="pqr${qi}"></div></div>`;
-    });
-    document.getElementById('plenQuiz').innerHTML=qHtml;
-  } else {
-    GS.plenQuizTotal=0;
-  }
-
-  document.getElementById('plenaryModal').classList.add('open');
-}
-
-// Transition from phase 1 (debrief) to phase 2 (quiz)
-function plenPhase2(){
-  document.getElementById('plenPhase1').style.display='none';
-  document.getElementById('plenPhase2').style.display='block';
-  document.querySelector('.plen-box').scrollTop=0;
-  if(GS.plenQuizTotal===0) document.getElementById('plenContinue').style.display='block';
-}
-
-
-// Report question answered in plenary — unlocks the quiz
-function plenReport(chosen,correct,savedId){
-  document.querySelectorAll('.pq-report-opt').forEach(b=>{
-    b.disabled=true;
-    if(b.dataset.team===chosen)b.classList.add(chosen===correct?'correct':'wrong');
-    if(b.dataset.team===correct&&chosen!==correct)b.classList.add('correct');
-  });
-  const ok=(chosen===correct);
-  const r=document.getElementById('pqr_report');
-  r.textContent=ok?'✓ Correct!':'Correct team is shown above.';
-  r.className='pq-result '+(ok?'ok':'bad');
-  doReport(ok,correct,savedId);
-  toast(ok?'✓ Right team!':'✗ Wrong team',ok?'ok':'bad');
-  // Write report result into results tab slot
-  const slot=document.getElementById('reportResultSlot');
-  if(slot)slot.innerHTML=`<div class="rc ${ok?'ok':'bad'}" style="margin-top:8px;"><h3>${ok?'✓':'✗'} Report ${ok?'to right team':'wrong team'}</h3><p>Correct: <strong>${esc(correct)}</strong></p></div>`;
-  GS.plenReportDone=true;
-  document.getElementById('plenToQuiz').style.display='block';
-}
-
-function plenAnswer(qi,oi,correct){
-  const opts=document.querySelectorAll(`#pq${qi} .pq-opt`);
-  opts.forEach(b=>b.disabled=true);
-  const r=document.getElementById('pqr'+qi);
-  GS.quizTotal=(GS.quizTotal||0)+1;
-  if(oi===correct){
-    opts[oi].classList.add('correct');
-    r.textContent='✓ Correct! +15 XP';r.className='pq-result ok';
-    try{SFX.correct();}catch(e){}
-    addXP(15);
-    GS.quizCorrect=(GS.quizCorrect||0)+1;
-  } else {
-    opts[oi].classList.add('wrong');opts[correct].classList.add('correct');
-    r.textContent='Answer shown above in green.';r.className='pq-result bad';
-    try{SFX.wrong();}catch(e){}
-  }
-  GS.plenQuizAnswered=(GS.plenQuizAnswered||0)+1;
-  checkPlenComplete();
-}
-
-function checkPlenComplete(){
-  if(GS.plenQuizAnswered>=(GS.plenQuizTotal||0)){
-    setTimeout(()=>{document.getElementById('plenContinue').style.display='block';},600);
-  }
-}
-
-function closePlenary(){
-  const savedId=GS.debriefModId;
-  document.getElementById('plenaryModal').classList.remove('open');
-  if(savedId){gcMod(savedId,'scenarioComplete',300);}
-  document.getElementById('btnRefresh').classList.add('pulse-glow');
-  GS.debriefModId=null;
-  if(GS.round>=GS.totalRounds&&!GS.queue.length){setTimeout(showEndgame,2000);}
-  else{schedAutoAdvance(18000);}
-}
 
 // ── ENDGAME — delegates to gamification.js ──────────────────────
 function showEndgame(){
@@ -1651,7 +980,7 @@ function resetAll(){
   document.body.classList.remove('alert-mode');
   GS.briefingsSeen=new Set();
   GS.howToPlaySeen=false;
-  Object.assign(GS,{hearts:GS.maxH,xp:0,round:0,modId:null,scenario:null,correctTool:null,toolOk:false,reportReady:false,active:false,phishDone:false,ipDone:false,queue:[],forceMod:null,badTools:0,sessId:uid(),scenarioRagDone:true,ip:{},gfr:null,autoTimer:null,stuckTimer:null,stuckStep:0,pendingEmail:null,debriefModId:null,plenReportDone:false,plenQuizAnswered:0,plenQuizTotal:0,quizCorrect:0,quizTotal:0,phishReported:false,ipWon:false,livesLost:0,selectedEmailId:null,emailOpened:false,briefingsSeen:new Set(),stuckCount:0,stuckTimer:null,sessionFlags:{allGreenUsed:false,highEscalationUsed:false,lastWasLow:false}});
+  Object.assign(GS,{hearts:GS.maxH,xp:0,round:0,modId:null,scenario:null,correctTool:null,toolOk:false,reportReady:false,active:false,phishDone:false,ipDone:false,difficulty:1,preBriefDone:new Set(),queue:[],forceMod:null,badTools:0,sessId:uid(),scenarioRagDone:true,ip:{},gfr:null,autoTimer:null,stuckTimer:null,stuckStep:0,pendingEmail:null,debriefModId:null,plenReportDone:false,plenQuizAnswered:0,plenQuizTotal:0,quizCorrect:0,quizTotal:0,phishReported:false,ipWon:false,livesLost:0,difficulty:1,preBriefDone:new Set(),difficulty:1,preBriefDone:new Set(),selectedEmailId:null,emailOpened:false,briefingsSeen:new Set(),stuckCount:0,stuckTimer:null,sessionFlags:{allGreenUsed:false,highEscalationUsed:false,lastWasLow:false}});
   rHearts();rXP();rRound();
   document.getElementById('ilist').innerHTML=`<div id="ilistEmpty" style="padding:16px;font-size:15px;color:rgba(0,255,65,.35);text-align:center;line-height:2.4;">No alerts yet.<br><span style="color:var(--g);font-size:14px;">▲ Check the alert queue above to begin.</span></div>`;
   document.getElementById('welcomeMsg').style.display='block';document.getElementById('emailView').style.display='none';
