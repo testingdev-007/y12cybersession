@@ -256,23 +256,13 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .modbtn.active{border-color:var(--amb);background:rgba(255,170,0,.2);}
 .modbtn:hover{background:rgba(255,170,0,.15);}
 
-/* ── IP OVERLAY ── */
-#ipOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:200;justify-content:flex-start;align-items:center;overflow-y:auto;padding:12px 0;}
-#ipOverlay.open{display:flex;}
-.ipbox{background:#060606;border:2px solid var(--red);box-shadow:0 0 55px rgba(255,0,64,.55);border-radius:6px;padding:22px;width:min(720px,97vw);animation:fadeUp .3s ease;}
+
 .iptitle{font-family:'Orbitron',monospace;font-size:20px;color:var(--red);text-shadow:0 0 18px var(--red);text-align:center;letter-spacing:3px;margin-bottom:14px;animation:pulse 1s ease infinite;}
 .ipbig{font-family:'Orbitron',monospace;font-size:44px;color:var(--red);text-shadow:0 0 28px var(--red);text-align:center;line-height:1;margin-bottom:8px;}
 .ipbig.danger{animation:pulse .4s ease infinite;color:#ff6688;}
 .iphopinfo{font-size:13px;color:#ff9999;text-align:center;margin:8px 0;min-height:18px;}
 .ipeasyopts{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;}
-.iptextopt{
-  display:block;width:100%;padding:10px 14px;margin-bottom:7px;
-  background:rgba(0,255,65,.06);border:1px solid rgba(0,255,65,.3);
-  border-radius:5px;color:rgba(0,255,65,.85);font-size:12px;line-height:1.5;
-  text-align:left;cursor:pointer;transition:background .15s,border-color .15s;
-  font-family:inherit;letter-spacing:.01em;
-}
-.iptextopt:hover{background:rgba(0,255,65,.15);border-color:rgba(0,255,65,.7);color:#00ff99;}
+
 .ipeasy{flex:1;min-width:140px;padding:12px;background:rgba(255,0,64,.07);border:2px solid var(--red);color:var(--red);font-family:'Share Tech Mono',monospace;font-size:14px;cursor:pointer;border-radius:5px;text-align:center;transition:all .18s;letter-spacing:1px;}
 .ipeasy:hover{background:rgba(255,0,64,.22);box-shadow:0 0 16px rgba(255,0,64,.38);transform:scale(1.03);}
 #ipHardInput{display:none;}
@@ -786,6 +776,72 @@ html,body{ height:var(--app-h); }
 .gm-brief-txt{font-size:13px;color:#b8e8b8;line-height:1.6;}
 .gm-ok{width:100%;padding:13px;margin-top:18px;font-size:13px;letter-spacing:.08em;}
 
+
+/* ── ANALYST PRE-BRIEF ────────────────────────────────────── */
+.pb-hdr{font-family:'Orbitron',monospace;font-size:9px;color:rgba(0,255,65,.35);
+        letter-spacing:.18em;margin-bottom:14px;}
+.pb-prog-wrap{margin-bottom:16px;}
+.pb-prog-track{width:100%;height:3px;background:rgba(0,255,65,.12);border-radius:2px;margin-bottom:6px;}
+.pb-prog-fill{height:3px;background:var(--g);border-radius:2px;
+              transition:width .4s cubic-bezier(.4,0,.2,1);box-shadow:0 0 8px var(--g);}
+.pb-prog-lbl{font-size:10px;color:rgba(0,255,65,.4);letter-spacing:.08em;}
+.pb-ref{margin-bottom:14px;border:1px solid rgba(0,255,65,.15);border-radius:5px;overflow:hidden;}
+.pb-ref>summary{display:block;padding:7px 12px;font-size:11px;color:rgba(0,255,65,.45);
+                cursor:pointer;user-select:none;list-style:none;}
+.pb-ref>summary::before{content:'▶  ';font-size:8px;}
+.pb-ref[open]>summary::before{content:'▼  ';}
+.pb-ref-body{padding:10px 12px;font-size:11px;color:rgba(0,255,65,.6);line-height:1.65;
+             border-top:1px solid rgba(0,255,65,.1);text-align:left;}
+.pb-q{font-size:14px;color:#b8ffb8;font-weight:600;line-height:1.5;margin-bottom:16px;text-align:left;}
+@keyframes pbSlide{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.pb-q-wrap{animation:pbSlide .22s ease both;}
+.pb-opt{display:block;width:100%;padding:11px 14px;margin-bottom:8px;
+        background:rgba(0,255,65,.04);border:1px solid rgba(0,255,65,.2);
+        border-radius:5px;color:rgba(0,255,65,.85);font-size:12px;
+        line-height:1.45;text-align:left;cursor:pointer;font-family:inherit;
+        -webkit-appearance:none;transition:background .12s,border-color .12s,color .12s;}
+.pb-opt:hover:not(:disabled){background:rgba(0,255,65,.1);border-color:rgba(0,255,65,.5);}
+.pb-opt.pb-ok{background:rgba(0,255,65,.15);border-color:var(--g);
+              color:#00ff99;box-shadow:0 0 10px rgba(0,255,65,.2);}
+.pb-opt.pb-ok::before{content:'✓  ';}
+.pb-opt.pb-err{background:rgba(255,0,64,.1);border-color:var(--red);color:var(--red);}
+.pb-opt.pb-err::before{content:'✗  ';}
+.pb-opt.pb-dim{opacity:.3;cursor:default;}
+.pb-fb{margin-top:12px;padding-top:12px;border-top:1px solid rgba(0,255,65,.1);text-align:left;}
+.pb-fb-result{font-size:14px;font-weight:900;margin-bottom:6px;}
+.pb-fb-hint{font-size:11px;color:rgba(0,255,65,.6);line-height:1.6;}
+.pb-next{display:block;width:100%;padding:10px;margin-top:14px;
+         background:rgba(0,255,65,.07);border:1px solid rgba(0,255,65,.38);
+         border-radius:5px;color:#00ff99;font-family:'Orbitron',monospace;
+         font-size:11px;letter-spacing:.08em;cursor:pointer;
+         transition:background .12s,border-color .12s;}
+.pb-next:hover{background:rgba(0,255,65,.14);border-color:var(--g);}
+/* Results */
+@keyframes pbRingPop{0%{transform:scale(.55);opacity:0}75%{transform:scale(1.07)}100%{transform:scale(1);opacity:1}}
+.pb-score-ring{width:108px;height:108px;border-radius:50%;margin:0 auto 14px;
+               border:3px solid var(--g);display:flex;flex-direction:column;
+               justify-content:center;align-items:center;
+               box-shadow:0 0 36px rgba(0,255,65,.45),inset 0 0 20px rgba(0,255,65,.08);
+               animation:pbRingPop .55s cubic-bezier(.17,.67,.3,1.4) both;}
+.pb-score-ring.pb-ring-amb{border-color:var(--amb);box-shadow:0 0 36px rgba(255,170,0,.45),inset 0 0 20px rgba(255,170,0,.08);}
+.pb-score-ring.pb-ring-fnd{border-color:#4dc8ff;box-shadow:0 0 36px rgba(77,200,255,.45),inset 0 0 20px rgba(77,200,255,.08);}
+.pb-score-num{font-family:'Orbitron',monospace;font-size:34px;font-weight:900;color:var(--g);line-height:1;}
+.pb-score-ring.pb-ring-amb .pb-score-num{color:var(--amb);}
+.pb-score-ring.pb-ring-fnd .pb-score-num{color:#4dc8ff;}
+.pb-score-denom{font-size:10px;color:rgba(0,255,65,.45);letter-spacing:.1em;}
+.pb-score-sub{font-size:10px;color:rgba(0,255,65,.4);margin-bottom:18px;}
+.pb-diff-badge{border-radius:7px;padding:15px 18px;margin-bottom:18px;
+               border:2px solid var(--g);background:rgba(0,0,0,.4);}
+.pb-diff-lbl{font-size:9px;color:rgba(255,255,255,.3);letter-spacing:.18em;margin-bottom:6px;}
+.pb-diff-name{font-family:'Orbitron',monospace;font-size:21px;font-weight:900;color:var(--g);
+              text-shadow:0 0 20px rgba(0,255,65,.6);}
+.pb-diff-desc{font-size:11px;color:rgba(255,255,255,.48);margin-top:9px;line-height:1.55;}
+.pb-go{display:block;width:100%;padding:13px;background:rgba(0,255,65,.08);
+       border:2px solid var(--g);border-radius:6px;color:#00ff99;
+       font-family:'Orbitron',monospace;font-size:12px;letter-spacing:.1em;cursor:pointer;
+       transition:background .12s;box-shadow:0 0 14px rgba(0,255,65,.15);}
+.pb-go:hover{background:rgba(0,255,65,.16);}
+
 </style>
 </head>
 <body>
@@ -914,8 +970,14 @@ window.addEventListener('load',function(){
   <canvas id="wm-matrix" style="position:absolute;inset:0;width:100%;height:100%;opacity:.07;pointer-events:none;"></canvas>
   <div class="wm-logo">CYBERSHIELD<br>ANALYST EDITION</div>
   <div class="wm-sub">SECURITY OPERATIONS CENTRE SIMULATION</div>
+  <div style="background:rgba(255,0,64,.07);border:1px solid rgba(255,0,64,.25);border-radius:6px;padding:12px 14px;margin:14px auto;max-width:380px;text-align:left;font-size:11px;line-height:1.6;color:rgba(255,180,180,.8);">
+    <div style="font-family:'Orbitron',monospace;font-size:9px;color:rgba(255,0,64,.7);letter-spacing:.15em;margin-bottom:6px;">🔴 ACTIVE INCIDENT</div>
+    <strong style="color:#ff6080;">TechCorp Global Ltd</strong> — UK payment processor, 500,000 customers.<br>
+    Confirmed breach. Attacker may still have access.<br>
+    <span style="color:rgba(255,180,180,.6);">Your role: triage the incident queue across all affected systems.</span>
+  </div>
   <button class="wm-btn" onclick="this.closest('#welcomeModal').style.display='none';if(typeof launchMission==='function')launchMission();">▶ BEGIN SESSION</button>
-  <div class="wm-hint">Mapped to OCR H446 A-Level Computer Science</div>
+  <div class="wm-hint" style="max-width:380px;margin:0 auto;">You have been called in to support the <strong>TechCorp Global</strong> incident response. One company. One breach. Seven analyst perspectives.</div>
 </div>
 
 <!-- RESET CONFIRM -->
@@ -1004,36 +1066,6 @@ window.addEventListener('load',function(){
 </div>
 
 <!-- IP OVERLAY -->
-<div id="ipOverlay">
-  <div class="ipbox">
-    <div class="iptitle">⚠ ACTIVE INTRUSION — TRACE INITIATED</div>
-    <div id="ipMode">
-      <div class="ipmodeintro">Active intrusion detected. The attacker is routing through a proxy chain — identify each relay node to trace the origin. Read each IP carefully: the final hops use near-identical addresses.</div>
-      <button class="btn btn-r btn-orb" style="width:80%;padding:14px;font-size:16px;margin-top:16px;" onclick="startTrace()">▶ INITIATE TRACE</button>
-    </div>
-    <div id="ipTrace" style="display:none;">
-      <div class="ipbig" id="ipTimer">60</div>
-      <!-- Fixed IP display — never disappears -->
-      <div class="ip-locpanel">
-        <div class="ip-city-label" id="ipCurrentCity">Waiting for trace…</div>
-        <div class="ip-ip-display" id="ipCurrentIP">—</div>
-      </div>
-      <div id="ipMapWrap" style="position:relative;width:100%;border-radius:4px;overflow:hidden;">
-      
-      <canvas id="ipMapCanvas" style="position:absolute;inset:0;width:100%;height:100%;background:transparent;"></canvas>
-    </div>
-      <div class="iphopinfo" id="ipHopInfo">Initialising trace…</div>
-      <div class="ipeasyopts" id="ipEasyOpts"></div>
-
-      <div class="ipstat" id="ipStat"></div>
-    </div>
-    <div id="ipResult" style="display:none;">
-      <div class="ipresult" id="ipResultInner"></div>
-      <button class="btn btn-g btn-orb" style="width:100%;padding:12px;margin-top:14px;font-size:13px;" onclick="closeIPTrace()">CLOSE & CONTINUE</button>
-    </div>
-  </div>
-</div>
-
 <!-- END OVERLAY (kept as fallback) -->
 <div id="endOverlay" style="display:none;"></div>
 
