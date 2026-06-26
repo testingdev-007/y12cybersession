@@ -24,6 +24,56 @@ var SESSION_HISTORY = {
   scenarioKeys: new Set(),     // 'modId_numEsc_type' — avoid identical patterns
 };
 
+// ── UTILITIES ────────────────────────────────────────────────
+function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
+function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function randInt(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
+
+// ── CHAT ─────────────────────────────────────────────────────
+function gcMsg(pId,msg,delay=0){
+  const p=PERSONAS[pId];if(!p||!msg)return;
+  setTimeout(()=>{
+    const now=new Date();
+    const t=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+    const w=document.createElement('div');w.className='cmsg p'+pId;
+    w.innerHTML='<div class="chdr"><span class="cname">'+esc(p.name)+'</span><span class="ctime">'+t+'</span></div><div class="cbub">'+esc(msg)+'</div>';
+    const box=document.getElementById('chatMsgs');
+    if(box){box.appendChild(w);box.scrollTop=box.scrollHeight;}
+    try{SFX.chatPing();}catch(e){}
+  },delay);
+}
+
+function gcMod(modId,event,delay=0){
+  try{
+    // Module-specific pool first, then global fallback
+    var pool=(MODULE_GROUP_CHAT[modId]||{})[event]||(GLOBAL_CHAT[event]||[]);
+    if(!pool.length)return;
+    var e=pick(pool);if(!e)return;
+    gcMsg(e.persona,pick(e.msgs),delay);
+  }catch(err){}
+}
+
+function gcModLoad(modId){
+  try{
+    var chat=MODULE_GROUP_CHAT[modId]||{};
+    var l1=chat.onLoad_1||[],l2=chat.onLoad_2||[];
+    if(l1.length){var e=pick(l1);gcMsg(e.persona,pick(e.msgs),400);}
+    if(l2.length){var e2=pick(l2);gcMsg(e2.persona,pick(e2.msgs),2500);}
+  }catch(err){}
+}
+
+
+// ── TOOL ICONS ───────────────────────────────────────────────
+var TOOL_ICONS={
+  'Packet Capture Analyser':'📡',
+  'Encryption Audit Tool':'🔐',
+  'SQL Query Log Viewer':'🗄',
+  'Firewall Rule Manager':'🛡',
+  'Legal Reference Database':'⚖',
+  'Social Engineering Alert Triage':'🎭',
+  'Endpoint Detection Log Viewer':'💻',
+};
+
 var GS = {
   maxH:3, hearts:3, xp:0,
   round:0, totalRounds:4,
@@ -406,138 +456,111 @@ function buildScenarioParams(){
 
 
 
-// ── ANALYST PRE-BRIEF — diagnostic & adaptive difficulty ─────
+// ── ANALYST PRE-BRIEF — chat-based ───────────────────────────
 var _pb = {};
 
 function showPreBrief(mod, onComplete){
   if(!mod||!mod.diagnosticQuestions||!mod.diagnosticQuestions.length){if(onComplete)onComplete();return;}
-  function shuf(arr){var a=arr.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
-  _pb={
-    pool:shuf(mod.diagnosticQuestions).slice(0,5),
-    idx:0, score:0, onComplete:onComplete,
-    summary:mod.diagnosticSummary||'', name:mod.name,
-    shuffled:null, correctIdx:0
-  };
-  _pbShowQ();
+  function shuf(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+  _pb={pool:shuf(mod.diagnosticQuestions).slice(0,5),idx:0,score:0,onComplete:onComplete};
+  gcMsg('priya','New case incoming. Quick knowledge check first — five questions.',400);
+  setTimeout(_pbChatQ, 1400);
 }
 
-function _pbShowQ(){
-  var idx=_pb.idx;
-  var q=_pb.pool[idx];
-  var mapped=q.opts.map(function(t,i){return{text:t,ok:(i===q.ok),hint:q.hint||''};});
-  for(var i=mapped.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=mapped[i];mapped[i]=mapped[j];mapped[j]=t;}
-  _pb.shuffled=mapped;
-  _pb.correctIdx=mapped.findIndex(function(o){return o.ok;});
+function _pbChatQ(){
+  var idx=_pb.idx, q=_pb.pool[idx];
+  var opts=q.opts.map(function(t,i){return{text:t,ok:(i===q.ok),hint:q.hint||''};});
+  for(var i=opts.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=opts[i];opts[i]=opts[j];opts[j]=t;}
+  _pb.shuffled=opts;
+  _pb.correctIdx=opts.findIndex(function(o){return o.ok;});
 
-  var pct=Math.round((idx/5)*100)+'%';
-  var opts='';
-  mapped.forEach(function(opt,i){
-    opts+='<button class="pb-opt" onclick="_pbAnswer('+i+')">'+esc(opt.text)+'</button>';
-  });
+  var asker=pick(['zara','marcus','priya']);
+  var btns=opts.map(function(o,i){
+    return '<button class="pb-opt" onclick="_pbChatAns('+i+')">'+esc(o.text)+'</button>';
+  }).join('');
 
-  var html=
-    '<div class="pb-hdr">ANALYST PRE-BRIEF &mdash; '+esc(_pb.name)+'</div>'+
-    '<div class="pb-prog-wrap">'+
-    '<div class="pb-prog-track"><div class="pb-prog-fill" id="pbFill" style="width:'+pct+'"></div></div>'+
-    '<div class="pb-prog-lbl">QUESTION '+(idx+1)+' OF 5</div>'+
-    '</div>'+
-    '<details class="pb-ref">'+
-    '<summary>Background reference</summary>'+
-    '<div class="pb-ref-body">'+esc(_pb.summary)+'</div>'+
-    '</details>'+
-    '<div class="pb-q-wrap">'+
-    '<div class="pb-q">'+esc(q.q)+'</div>'+
-    opts+
+  var now=new Date();
+  var t=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  var w=document.createElement('div');
+  w.className='cmsg p'+asker+' cmsg-pb';
+  w.id='pb-q-'+idx;
+  w.innerHTML=
+    '<div class="chdr"><span class="cname">'+esc(PERSONAS[asker].name)+'</span>'+
+    '<span class="ctime">'+t+'&nbsp;&nbsp;'+( idx+1)+'/5</span></div>'+
+    '<div class="cbub">'+
+    '<div class="pb-qlbl">PRE-BRIEF</div>'+
+    '<div class="pb-qtext">'+esc(q.q)+'</div>'+
+    '<div class="pb-opts">'+btns+'</div>'+
     '</div>';
 
-  var el=document.getElementById('gameModal');
-  var body=document.getElementById('gameModalBody');
-  if(el&&body){body.innerHTML=html;el.style.display='flex';}
-  // Animate fill bar after render
-  requestAnimationFrame(function(){
-    var fill=document.getElementById('pbFill');
-    if(fill) fill.style.width=pct;
-  });
+  var box=document.getElementById('chatMsgs');
+  if(box){box.appendChild(w);box.scrollTop=box.scrollHeight;}
+  try{SFX.chatPing();}catch(e){}
 }
 
-window._pbAnswer=function(chosen){
+window._pbChatAns=function(chosen){
   var correct=(chosen===_pb.correctIdx);
-  if(correct) _pb.score++;
+  if(correct)_pb.score++;
   var hint=_pb.shuffled[_pb.correctIdx].hint;
+  var rightText=_pb.shuffled[_pb.correctIdx].text;
+
+  // Style buttons in-place
+  var msgEl=document.getElementById('pb-q-'+_pb.idx);
+  if(msgEl){
+    msgEl.querySelectorAll('.pb-opt').forEach(function(b,i){
+      b.disabled=true;
+      b.className='pb-opt '+(i===_pb.correctIdx?'pbo-ok':(i===chosen?'pbo-err':'pbo-dim'));
+    });
+  }
   _pb.idx++;
 
-  var body=document.getElementById('gameModalBody');
-  if(!body) return;
-
-  // Style the option buttons
-  body.querySelectorAll('.pb-opt').forEach(function(b,i){
-    b.disabled=true;
-    if(i===_pb.correctIdx) b.className='pb-opt pb-ok';
-    else if(i===chosen&&!correct) b.className='pb-opt pb-err';
-    else b.className='pb-opt pb-dim';
-  });
-
-  // Append feedback
-  var fb=document.createElement('div');
-  fb.className='pb-fb';
-  fb.innerHTML=
-    '<div class="pb-fb-result" style="color:'+(correct?'var(--g)':'var(--red)')+';">'
-    +(correct?'&#10003; CORRECT':'&#10007; INCORRECT')+'</div>'
-    +(hint?'<div class="pb-fb-hint">'+esc(hint)+'</div>':'')
-    +'<button class="pb-next" onclick="_pbNext()">'
-    +(_pb.idx<_pb.pool.length?'NEXT QUESTION &rarr;':'SEE RESULTS &rarr;')+'</button>';
-  body.appendChild(fb);
-  body.scrollTop=9999;
+  // Feedback reply from a different persona
+  var responder=pick(['zara','marcus','priya']);
+  var fb=correct
+    ? pick(['Correct. ','Right. ','Yes. '])+(hint||'')
+    : 'No — '+(hint||rightText+'.');
+  setTimeout(function(){
+    gcMsg(responder,fb,0);
+    if(_pb.idx<_pb.pool.length) setTimeout(_pbChatQ,900);
+    else setTimeout(_pbChatFinal,900);
+  },250);
 };
 
-window._pbNext=function(){
-  if(_pb.idx<_pb.pool.length) _pbShowQ();
-  else _pbShowResults();
-};
-
-function _pbShowResults(){
-  var s=_pb.score, t=_pb.pool.length;
+function _pbChatFinal(){
+  var s=_pb.score,t=_pb.pool.length;
   var diff=s<=1?0:s<=3?1:2;
   GS.difficulty=diff;
-
   var cfgs=[
-    {label:'FOUNDATION',col:'#4dc8ff',glow:'rgba(77,200,255,.55)',ringCls:'pb-ring-fnd',
-     desc:'The module will focus on clear-cut cases to build your foundation. Chat hints are fully available.'},
-    {label:'STANDARD',col:'var(--g)',glow:'rgba(0,255,65,.55)',ringCls:'',
-     desc:'A balanced mix of clear cases and edge cases across the module.'},
-    {label:'ADVANCED',col:'var(--amb)',glow:'rgba(255,170,0,.55)',ringCls:'pb-ring-amb',
-     desc:'The module emphasises ambiguous edge cases demanding precise analysis. Minimal hints.'}
+    {label:'FOUNDATION',col:'#4dc8ff',glow:'rgba(77,200,255,.5)',
+     desc:'Clear cases. Hints on.'},
+    {label:'STANDARD',  col:'var(--g)',glow:'rgba(0,255,65,.5)',
+     desc:'Balanced case mix.'},
+    {label:'ADVANCED',  col:'var(--amb)',glow:'rgba(255,170,0,.5)',
+     desc:'Edge cases. Minimal hints.'},
   ];
   var cfg=cfgs[diff];
 
-  var html=
-    '<div class="pb-hdr">PRE-BRIEF COMPLETE &mdash; '+esc(_pb.name)+'</div>'+
-    '<div class="pb-score-ring '+(cfg.ringCls)+'">'+
-    '<div class="pb-score-num">'+s+'</div>'+
-    '<div class="pb-score-denom">OUT OF '+t+'</div>'+
-    '</div>'+
-    '<div class="pb-score-sub">prerequisite knowledge check</div>'+
-    '<div class="pb-diff-badge" style="border-color:'+cfg.col+';box-shadow:0 0 18px '+cfg.glow+';">'+
-    '<div class="pb-diff-lbl">DIFFICULTY CALIBRATED TO</div>'+
-    '<div class="pb-diff-name" style="color:'+cfg.col+';text-shadow:0 0 22px '+cfg.glow+';">'+cfg.label+'</div>'+
-    '<div class="pb-diff-desc">'+cfg.desc+'</div>'+
-    '</div>'+
-    '<button class="pb-go" onclick="_pbComplete()">&#9654; PROCEED TO MISSION</button>';
+  // Score message
+  gcMsg('priya',s+'/'+t+' — '+(s>=4?'strong.':s>=2?'solid.':'noted.'),200);
 
-  var el=document.getElementById('gameModal');
-  var body=document.getElementById('gameModalBody');
-  if(el&&body){body.innerHTML=html;el.style.display='flex';}
+  // Difficulty badge as a chat message
+  setTimeout(function(){
+    var now=new Date();
+    var ts=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+    var w=document.createElement('div');
+    w.className='cmsg cmsg-diff';
+    w.innerHTML=
+      '<div class="cbub" style="border:1px solid '+cfg.col+';box-shadow:0 0 10px '+cfg.glow+'30;">'+
+      '<span class="pb-diff-name" style="color:'+cfg.col+';text-shadow:0 0 14px '+cfg.glow+';">'+cfg.label+'</span>'+
+      '<span class="pb-diff-desc">'+cfg.desc+'</span>'+
+      '</div>';
+    var box=document.getElementById('chatMsgs');
+    if(box){box.appendChild(w);box.scrollTop=box.scrollHeight;}
 
-  window._pbComplete=function(){
-    var el=document.getElementById('gameModal');
-    var body=document.getElementById('gameModalBody');
-    if(el) el.style.display='none';
-    if(body) body.innerHTML='';
     var cb=_pb.onComplete; _pb={};
-    if(cb) cb();
-  };
+    setTimeout(function(){if(cb)cb();},500);
+  },900);
 }
-
 
 // ── LOAD MODULE ───────────────────────────────────────────────
 function loadModule(id){
@@ -563,9 +586,26 @@ function loadModule(id){
   document.getElementById('scenProg').textContent='ROUND '+GS.round+'/'+GS.totalRounds;
   setSim(mod.name);setStep(1);
   resetTool();
-  const toolSel=document.getElementById('toolSel');
-  toolSel.innerHTML='<option value="">— Pick an investigation tool —</option>';
-  getToolOptions(id).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;toolSel.appendChild(o);});
+  // Build tool tile grid
+  var tg=document.getElementById('toolGrid');
+  if(tg){
+    tg.innerHTML='';
+    getToolOptions(id).forEach(function(t){
+      var tile=document.createElement('div');
+      tile.className='tool-tile';
+      tile.dataset.tool=t;
+      var icon=TOOL_ICONS[t]||'🔧';
+      tile.innerHTML='<span class="tt-icon">'+icon+'</span><span class="tt-name">'+esc(t)+'</span>';
+      tile.addEventListener('click',function(){
+        tg.querySelectorAll('.tool-tile').forEach(function(x){x.classList.remove('sel','tt-wrong');});
+        tile.classList.add('sel');
+        document.getElementById('toolSel').value=t;
+        loadTool();
+      });
+      tg.appendChild(tile);
+    });
+  }
+  document.getElementById('toolSel').value='';
   const email={id:Date.now(),sender:mod.emailSender(),subject:mod.emailSubject(),body:mod.emailBody(GS.scenario)+'\n\nLoad the investigation tool below. For each item, assess severity: RED (immediate threat), AMBER (investigate), or GREEN (legitimate). Select the appropriate action for each entry.',modId:id,phish:false};
   GS.pendingEmail=email;
   addToInbox(email);
@@ -736,6 +776,10 @@ function loadTool(){
     }catch(e){console.warn('Modal error (data still loaded):',e);}
   } else {
     GS.badTools++;loseH('Wrong tool');addXP(-5);gcMod(GS.modId,'onToolWrong');/*vox*/;
+    // Shake the wrong tile
+    var wt=document.querySelector('.tool-tile.sel');
+    if(wt){wt.classList.remove('sel');wt.classList.add('tt-wrong');setTimeout(function(){wt.classList.remove('tt-wrong');},600);}
+    document.getElementById('toolSel').value='';
     const hint=GS.badTools>=2?'<br><br><em>Hint: re-read the alert email — the incident type indicates the correct tool.</em>':'';
     document.getElementById('toolData').innerHTML=`<div class="terr">✗ <strong>${esc(v)}</strong> is not the correct tool for this incident type.${hint}<br><br>Review the email and try again.</div>`;
   }
@@ -766,11 +810,12 @@ function renderToolData(){
   }
   // Legend strip at top
   const legend=MODULE_LEGENDS[id]||'';
+  document.getElementById('toolPanel').classList.add('active-tool');
   let html=legend?`<div class="legend-strip">${esc(legend)}</div>`:'';
   sc.forEach((item,i)=>{
     const done=item.handled;
     const borderCol=done?(item.ragAnswer==='R'?'var(--red)':item.ragAnswer==='A'?'var(--amb)':'var(--g)'):'rgba(0,255,65,0.18)';
-    html+=`<div class="dcard${done?' done':''}" id="dr${i}" style="border-left:4px solid ${borderCol}" >`;
+    html+=`<div class="dcard${done?' done':''}" id="dr${i}" style="border-left:5px solid ${borderCol};animation-delay:${i*0.06}s" >`;
     html+=`<div class="dcard-head">`;
     html+=`<span class="dcard-name">${esc(item.name)}</span>`;
     if(done){const ok=item.userAction===item.actionAnswer;html+=`<span class="sbadge ${ok?'sbok':'sberr'}">${ok?'✓':'✗'}</span>`;}
@@ -833,6 +878,13 @@ function doAction(rowIdx,actId){
   item.handled=true;
   item.userAction=actId;
   const ao=(actId===item.actionAnswer);
+  // Flash the card
+  var cardEl=document.getElementById('dr'+rowIdx);
+  if(cardEl){
+    cardEl.classList.remove('flash-ok','flash-err');
+    void cardEl.offsetWidth;
+    cardEl.classList.add(ao?'flash-ok':'flash-err');
+  }
   // Varied XP messages so it doesn't feel robotic
   var rightMsgs=['✓ Correct. +15 XP','✓ Right call. +15 XP','✓ Confirmed. +15 XP','✓ Accurate assessment. +15 XP','✓ Exact match. +15 XP','✓ Correct action. +15 XP','✓ Good analysis. +15 XP','✓ Spot on. +15 XP','✓ Well identified. +15 XP','✓ Precisely right. +15 XP','✓ Correct classification. +15 XP','✓ Correct. +15 XP'];
   var wrongMsgs=['Incorrect — review the item notes below. (-5 XP)','Not this time. Check the reasoning. (-5 XP)','Wrong call — correct action shown. (-5 XP)','Missed that one. (-5 XP)','Incorrect assessment. (-5 XP)','Not right — re-read the indicator. (-5 XP)','Wrong. See the correct answer below. (-5 XP)','Incorrect — note why the answers differ. (-5 XP)','Off. Review the item criteria. (-5 XP)','Incorrect. (-5 XP)'];
@@ -987,7 +1039,10 @@ function resetAll(){
   document.getElementById('resultsView').innerHTML='Results appear here after each mission.';
   document.getElementById('chatMsgs').innerHTML='';
   resetTool();clearGlows();
-  document.getElementById('toolSel').innerHTML='<option value="">— Choose your investigation tool —</option>';
+  document.getElementById('toolSel').value='';
+  var tgr=document.getElementById('toolGrid');
+  if(tgr)tgr.innerHTML='<div class="tt-placeholder">📧 Open an alert email to reveal available tools</div>';
+  var tp=document.getElementById('toolPanel');if(tp)tp.classList.remove('active-tool');
   document.getElementById('scenProg').textContent='';
   document.getElementById('chatMsgs').innerHTML='';
   setSim('READY');setStep(0);
