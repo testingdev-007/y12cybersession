@@ -468,7 +468,9 @@ function showPreBrief(mod, onComplete){
 }
 
 function _pbChatQ(){
+  if(!_pb||!_pb.pool||_pb.idx==null||_pb.idx>=_pb.pool.length)return;
   var idx=_pb.idx, q=_pb.pool[idx];
+  if(!q||!q.opts)return;
   var opts=q.opts.map(function(t,i){return{text:t,ok:(i===q.ok),hint:q.hint||''};});
   for(var i=opts.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=opts[i];opts[i]=opts[j];opts[j]=t;}
   _pb.shuffled=opts;
@@ -953,6 +955,120 @@ function doReport(ok,correct,savedId){
 }
 
 // ── RESULTS ───────────────────────────────────────────────────
+function showPlenary(modId,scenario){
+  const mod=MODULES[modId];
+  if(!mod)return;
+  const pl=mod.plenary||{};
+  const ct=mod.completionText||'';
+
+  // Pick 2 quiz questions
+  var pool=(pl.quiz||[]).slice();
+  for(var i=pool.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=pool[i];pool[i]=pool[j];pool[j]=t;}
+  var qqs=pool.slice(0,2);
+
+  // Accumulate HTML
+  var h='<div class="gm-title">MISSION DEBRIEF</div>';
+  h+='<div style="font-family:Orbitron,monospace;font-size:9px;color:rgba(0,255,65,.4);letter-spacing:.15em;margin-bottom:12px;">'+esc(mod.name)+'</div>';
+
+  if(ct){
+    h+='<div style="font-size:12px;color:rgba(0,255,65,.72);line-height:1.7;margin-bottom:14px;'+
+       'padding:10px 12px;background:rgba(0,255,65,.04);border-radius:5px;'+
+       'border:1px solid rgba(0,255,65,.15);white-space:pre-line;">'+esc(ct)+'</div>';
+  }
+
+  var pfields=[
+    {lbl:'WHAT HAPPENED',val:pl.whatHappened},
+    {lbl:'KEY MOVES',val:pl.keyMove},
+    {lbl:'ANALOGY',val:pl.analogy},
+    {lbl:'REAL WORLD',val:pl.realWorld},
+  ];
+  pfields.forEach(function(f){
+    if(!f.val)return;
+    h+='<div style="margin-bottom:11px;">'+
+       '<div style="font-size:8px;color:rgba(0,255,65,.38);letter-spacing:.16em;margin-bottom:3px;">'+f.lbl+'</div>'+
+       '<div style="font-size:12px;color:rgba(0,255,65,.75);line-height:1.65;">'+esc(f.val)+'</div></div>';
+  });
+
+  if(qqs.length){
+    h+='<div style="font-family:Orbitron,monospace;font-size:9px;color:rgba(0,255,65,.4);'+
+       'letter-spacing:.15em;margin:14px 0 8px;padding-top:10px;border-top:1px solid rgba(0,255,65,.12);">'+
+       'EXAM QUIZ</div>';
+    qqs.forEach(function(q,qi){
+      h+='<div id="plQ'+qi+'" style="margin-bottom:12px;">'+
+         '<div style="font-size:13px;color:#b8ffb8;font-weight:600;margin-bottom:8px;">'+esc(q.q)+'</div>';
+      q.options.forEach(function(opt,oi){
+        h+='<button class="gm-quiz-opt" data-qi="'+qi+'" data-oi="'+oi+'" '+
+           'onclick="_plenOpt('+qi+','+oi+','+q.correct+')" '+
+           'style="display:block;width:100%;padding:8px 11px;margin-bottom:5px;'+
+           'background:rgba(0,255,65,.04);border:1px solid rgba(0,255,65,.2);'+
+           'border-radius:4px;color:rgba(0,255,65,.82);font-size:12px;'+
+           'text-align:left;cursor:pointer;font-family:inherit;-webkit-appearance:none;">'+esc(opt)+'</button>';
+      });
+      h+='</div>';
+    });
+    h+='<button id="plenSubmit" class="btn btn-g btn-orb" '+
+       'style="width:100%;padding:10px;" onclick="_plenSubmit('+qqs.length+')">'+
+       'SUBMIT ANSWERS</button>';
+  } else {
+    h+='<button class="btn btn-g btn-orb" '+
+       'style="width:100%;padding:10px;margin-top:14px;" onclick="_closePlenary()">'+
+       'CONTINUE &rarr;</button>';
+  }
+
+  window._plenAnswers={};
+  window._plenOpt=function(qi,oi,correct){
+    window._plenAnswers[qi]={chosen:oi,correct:correct};
+    var qel=document.getElementById('plQ'+qi);
+    if(qel)qel.querySelectorAll('.gm-quiz-opt').forEach(function(b){
+      b.style.opacity=(parseInt(b.dataset.oi)===oi)?'1':'0.35';
+    });
+  };
+  window._plenSubmit=function(total){
+    var score=0;
+    for(var i=0;i<total;i++){
+      var ans=window._plenAnswers[i];
+      var qel=document.getElementById('plQ'+i);if(!qel)continue;
+      if(ans&&ans.chosen===ans.correct)score++;
+      qel.querySelectorAll('.gm-quiz-opt').forEach(function(b){
+        var oi=parseInt(b.dataset.oi),qi=parseInt(b.dataset.qi);
+        var a=window._plenAnswers[qi];
+        b.disabled=true;
+        if(!a){b.style.opacity='0.3';return;}
+        if(oi===a.correct){
+          b.style.cssText+=';background:rgba(0,255,65,.18);border-color:var(--g);color:#00ff99;opacity:1;';
+        } else if(oi===a.chosen&&a.chosen!==a.correct){
+          b.style.cssText+=';background:rgba(255,0,64,.1);border-color:var(--red);color:var(--red);opacity:1;';
+        } else {
+          b.style.opacity='0.3';
+        }
+      });
+    }
+    var xp=score*30;if(xp)addXP(xp);
+    var sub=document.getElementById('plenSubmit');
+    if(sub){
+      var sc=score===total?'#00ff99':'var(--amb)';
+      sub.outerHTML='<div style="text-align:center;margin:10px 0 6px;">'+
+        '<div style="font-family:Orbitron,monospace;font-size:20px;color:'+sc+';">'+score+'/'+total+'</div>'+
+        (xp?'<div style="font-size:12px;color:var(--g);margin-top:3px;">+'+xp+' XP</div>':'')+
+        '</div>'+
+        '<button class="btn btn-g btn-orb" style="width:100%;padding:10px;margin-top:8px;" '+
+        'onclick="_closePlenary()">CONTINUE &rarr;</button>';
+    }
+  };
+  window._closePlenary=function(){
+    var el=document.getElementById('gameModal');
+    var body=document.getElementById('gameModalBody');
+    if(el)el.style.display='none';
+    if(body)body.innerHTML='';
+    recordModuleResult(modId,scenario,0);
+  };
+
+  var el=document.getElementById('gameModal');
+  var body=document.getElementById('gameModalBody');
+  if(el&&body){body.innerHTML=h;el.style.display='flex';}
+}
+
+
 function showResults(savedId){
   const mod=MODULES[savedId],sc=GS.scenario;
   if(!mod||!sc)return;
