@@ -49,13 +49,36 @@ MODULES.packetAnalysis = {
   emailSender: ()=>pick(['nids@secops.internal','siem-alerts@infrasec.net','noc@threatwatch.io','soc@cyberdefence.net']),
   emailSubject: ()=>pick(['NIDS Alert: Anomalous Traffic Pattern Detected','SIEM P1 Alert: Network Anomaly Requires Triage','Packet Capture Review — Analyst Action Required','NOC Alert: Suspicious Traffic Flows']),
   emailBody(){
-    return pick([
-      `Analyst,\n\nThe NIDS has raised a P1 alert for anomalous network behaviour in the last 15 minutes. Several traffic flows require urgent triage.\n\nLoad the Packet Capture Analyser and classify each flow. Consider: packet rate, TCP flags, source behaviour and whether the pattern matches a known attack signature.\n\nNote: not all flows are malicious. Distinguish signal from noise.\n\nSecurity Operations Centre`,
-      `Hi,\n\nOur SIEM has correlated multiple alerts. A number of network flows look unusual — some may be attacks, others may be legitimate traffic coincidentally elevated.\n\nUse the Packet Capture Analyser to triage each flow. Focus on protocol, flags, rate and source reputation.\n\nCyber Defence Team`,
-      `Analyst,\n\nMultiple anomalous flows detected in the last capture window. This could range from active DDoS to routine scanning. Your triage determines our response.\n\nKey questions for each flow: Does the rate fit an attack profile? Do the TCP flags suggest a well-known attack vector? Is the source on any threat intelligence feeds?\n\nNOC`
-    ]);
+    return 'Analyst,\n\nWe\'re supporting TechCorp Global\'s incident response. '
+      +'Their NIDS captured network traffic during the 72-hour window before the confirmed breach.\n\n'
+      +'Triage each flow: some may show the attacker\'s reconnaissance. '
+      +'Identifying the initial scan pattern will help us reconstruct the attack timeline and timeline gaps.\n\n'
+      +'Time-sensitive — legal counsel need a preliminary report within 4 hours.\n\n'
+      +'Incident Response Lead';
   },
-
+  diagnosticSummary:'Network traffic is broken into packets each with a header (source IP, destination IP, port, protocol) and a payload. TCP provides reliable ordered delivery via the three-way handshake SYN then SYN-ACK then ACK. UDP is connectionless and faster with no delivery guarantee. Ports identify services: 80=HTTP, 443=HTTPS, 22=SSH, 53=DNS. Firewalls filter by IP, port and protocol.',
+  diagnosticQuestions:[
+    {q:'What does TCP stand for',opts:['Transfer Communication Protocol','Transmission Control Protocol','Traffic Control Protocol'],ok:1,hint:'TCP provides reliable ordered delivery confirmed by acknowledgements between sender and receiver.'},
+    {q:'What is a network port number used for',opts:['To identify the physical cable in use','To identify which application or service a packet is intended for','To assign a unique address to each device'],ok:1,hint:'Port numbers distinguish services on the same device — 80 for HTTP, 443 for HTTPS, 22 for SSH, 53 for DNS.'},
+    {q:'UDP is connectionless. What does this mean',opts:['UDP needs a username to connect','UDP sends data without establishing a connection so delivery is not guaranteed','UDP disconnects automatically after each message'],ok:1,hint:'UDP trades reliability for speed. No handshake, no acknowledgements — useful for streaming where a dropped packet matters less than delay.'},
+    {q:'What is a packet in networking',opts:['A bundle of physical cables','A formatted unit of data with a header and payload transmitted over a network','The software that manages network connections'],ok:1,hint:'Messages are split into packets, routed independently and reassembled at the destination. This is packet switching.'},
+    {q:'What does DNS do',opts:['Encrypts internet traffic','Translates domain names to IP addresses','Assigns IP addresses to devices on a network'],ok:1,hint:'DNS is the internet address book. Without it you would need the numeric IP address of every website you visit.'},
+    {q:'What is bandwidth',opts:['The physical width of a network cable','The maximum rate of data transfer across a network','The number of devices connected to a network'],ok:1,hint:'Bandwidth is measured in bits per second. Higher bandwidth means more data can move per second.'},
+    {q:'Port 443 is the default port for which protocol',opts:['HTTP unencrypted web traffic','FTP file transfer','HTTPS encrypted web traffic over TLS'],ok:2,hint:'HTTPS uses port 443. HTTP uses port 80. The S stands for Secure — TLS encryption is applied.'},
+    {q:'Packet switching means data',opts:['Travels as one continuous stream down a reserved path','Is broken into packets that may travel different routes and are reassembled at the destination','Can only be sent by one device at a time'],ok:1,hint:'Packet switching is efficient and resilient. Packets can route around failures and network capacity is shared.'},
+    {q:'What is a firewall primary role',opts:['To speed up network connections','To monitor and control incoming and outgoing traffic based on rules','To assign IP addresses to devices'],ok:1,hint:'Firewalls permit or deny traffic based on configurable rules covering IP address, port, protocol and direction.'},
+    {q:'What does ping measure',opts:['Connection speed in megabits per second','Whether a host is reachable and the round-trip latency in milliseconds','The number of devices on a network'],ok:1,hint:'Ping sends an ICMP echo request. The reply time is latency. No reply means the host is unreachable or blocking ICMP.'},
+    {q:'What is the TCP three-way handshake',opts:['SYN then ACK then FIN','SYN then SYN-ACK then ACK','HELLO then READY then GO'],ok:1,hint:'SYN means I want to connect. SYN-ACK means I acknowledge and I also want to connect. ACK means I acknowledge. Connection established.'},
+    {q:'What is ICMP primarily used for',opts:['Internal server messaging','Error reporting and network diagnostics such as ping and traceroute','Hardware monitoring'],ok:1,hint:'ICMP is used by ping and traceroute. It reports network errors and allows path analysis.'},
+    {q:'A static IP address means',opts:['The address is shared with other devices','The address is permanently assigned and does not change','The address is automatically assigned each session'],ok:1,hint:'Servers need static IPs so clients can reliably find them. Home users typically get dynamic IPs from DHCP.'},
+    {q:'What is latency',opts:['The rate at which data is transferred','The delay between sending a request and receiving a response','The number of transmission errors'],ok:1,hint:'Latency is measured in milliseconds. High latency makes real-time applications like video calls feel sluggish.'},
+    {q:'What distinguishes a LAN from a WAN',opts:['LANs use wireless WANs use cables','LANs cover a local area such as a building WANs cover larger distances','LANs are public WANs are private'],ok:1,hint:'LAN is Local Area Network covering a building or campus. WAN is Wide Area Network. The internet is a WAN.'},
+    {q:'What does a network switch do',opts:['Routes packets between different networks using IP addresses','Connects devices within the same network by forwarding frames using MAC addresses','Blocks unauthorised network access'],ok:1,hint:'Switches learn which device is on which port and send traffic only to the intended recipient.'},
+    {q:'What is a proxy server',opts:['A server that stores backup copies of data','An intermediary server that handles requests on behalf of clients allowing filtering logging and caching','A server that assigns IP addresses'],ok:1,hint:'Corporate proxies filter web access, log activity for compliance and cache content to save bandwidth.'},
+    {q:'What does half-open connection mean in TCP',opts:['A connection that transmits in one direction only','A SYN received but SYN-ACK not yet acknowledged — server resources allocated but connection incomplete','A connection with reduced bandwidth'],ok:1,hint:'Half-open connections are exploited by SYN flood attacks. The server allocates resources for each SYN — flooding exhausts capacity.'},
+    {q:'What is a network protocol',opts:['A document describing hardware specifications','A set of rules governing how data is formatted transmitted and received between devices','Software that physically connects devices'],ok:1,hint:'Protocols ensure devices from different manufacturers communicate reliably. HTTP, TCP, IP, DNS are all protocols.'},
+    {q:'A router primary job is to',opts:['Connect devices within the same local network using MAC addresses','Forward packets between different networks using IP addresses','Filter network traffic based on security rules'],ok:1,hint:'Routers operate at the network layer and use IP addresses to determine the best path between different networks.'}
+  ],
   tools: {
     correct: 'Packet Capture Analyser',
     decoys: ['Encryption Audit Tool','SQL Query Log Viewer','Firewall Rule Manager','Legal Reference Database','Vulnerability Scanner','DNS Lookup Tool','Certificate Checker']
@@ -69,7 +92,7 @@ MODULES.packetAnalysis = {
     realWorld: 'In September 2016 the Mirai botnet, comprising 100,000+ compromised IoT devices, attacked DNS provider Dyn at 1.2 Tbps using SYN floods and UDP amplification — taking Twitter, Reddit and Netflix offline for hours. The same botnet had previously attacked journalist Brian Krebs at 620 Gbps. Both attacks exploited default credentials on cameras and DVRs.'
   },
 
-  generateScenario({numItems=6}={}){
+  generateScenario({numItems=6,difficulty=1}={}){
     const pool = [
       // RED — clear attack signatures
       {
@@ -147,9 +170,16 @@ MODULES.packetAnalysis = {
         notes:'Standard SMTP email delivery from the internal mail relay. Volume and pattern are consistent with normal business email activity during working hours. Source is a known internal mail server.'
       },
     ];
-    const nR=pick([1,1,2,2,3]);
-    const nA=pick([0,1,1,2]);
-    const nG=numItems-nR-nA;
+    // Adaptive difficulty — set by Analyst Pre-Brief diagnostic score
+    var nR,nA,nG;
+    if(difficulty===0){           // FOUNDATION: clear-cut cases, minimal edge cases
+      nR=pick([2,2,3]); nA=pick([0,0,1]);
+    } else if(difficulty===2){    // ADVANCED: edge cases dominate, precision required
+      nR=pick([1,1,2]); nA=pick([2,3,3]);
+    } else {                      // STANDARD: balanced mix
+      nR=pick([1,1,2,2,3]); nA=pick([0,1,1,2]);
+    }
+    nG=numItems-nR-nA;
     return _pickPool(pool,nR,nA,Math.max(1,nG));
   },
 
@@ -158,9 +188,14 @@ MODULES.packetAnalysis = {
 
   completionText(_,sc){
     const att=sc.filter(s=>s.ragAnswer!=='G').length;
-    return `<div class="rc info"><h3>PACKET ANALYSIS — KEY PRINCIPLES</h3>
-    <p>${att} suspicious flow(s) identified. When triaging captures: <strong>rate</strong> (abnormally high?), <strong>flags</strong> (SYN without ACK = SYN flood), <strong>pattern</strong> (sequential ports = scan), <strong>asymmetry</strong> (small request/huge response = amplification).</p>
-    <p style="margin-top:8px;"><strong>Key concepts:</strong> TCP three-way handshake (SYN→SYN-ACK→ACK), DNS over UDP, packet switching, stateful firewalls, proxy servers, DDoS attack types.</p></div>`;
+    const sev=sc.filter(s=>s.ragAnswer==='R').length;
+    return `<div class="rc info">
+      <div style="font-family:'Orbitron',monospace;font-size:11px;color:rgba(0,255,65,.5);letter-spacing:.1em;margin-bottom:8px;">📁 TECHCORP IR — NETWORK ANALYSIS</div>
+      <p style="margin-bottom:8px;">You identified <strong>${sev} active threat(s)</strong> and ${att-sev} suspicious flow(s) in this capture window. ${sev>0?'These are consistent with the reconnaissance phase of the TechCorp breach — the attacker was mapping the network before moving to exploitation.':'No confirmed attacks in this window — but the suspicious flows warrant monitoring.'}</p>
+      <hr style="border-color:rgba(0,255,65,.15);margin:10px 0;">
+      <div style="font-family:'Orbitron',monospace;font-size:10px;color:rgba(0,255,65,.5);letter-spacing:.1em;margin-bottom:6px;">📝 EXAM FOCUS: NETWORKS & SECURITY</div>
+      <p style="font-size:12px;line-height:1.6;">Key concepts examiners test: <strong>TCP three-way handshake</strong> (SYN→SYN-ACK→ACK), <strong>SYN flood mechanics</strong> (half-open connections exhaust server), <strong>DNS amplification</strong> (small query → large response), <strong>packet vs circuit switching</strong>, <strong>role of firewalls and proxies</strong>. A 4-mark answer on SYN floods should cover: (1) mechanism, (2) why the server fails, (3) why it\'s hard to filter, (4) one countermeasure.</p>
+    </div>`;
   },
 
   actions:{ R:'block', A:'monitor', G:'allow' },
@@ -187,6 +222,13 @@ MODULES.packetAnalysis = {
       {q:'UDP differs from TCP in that it:',options:['Guarantees reliable, ordered delivery via acknowledgement numbers','Is faster but provides no delivery guarantees, ordering or flow control','Requires a three-way handshake before any data transfer can begin'],correct:1},
       {q:'The TCP three-way handshake sequence is:',options:['ACK → SYN → SYN-ACK (client confirms, server accepts, client acknowledges)','SYN → SYN-ACK → ACK (client requests, server responds, client confirms)','SYN → ACK → FIN (connect, confirm, terminate)'],correct:1},
       {q:'A stateful firewall differs from a stateless packet filter because it:',options:['Only examines source/destination IP addresses and port numbers in the header','Tracks the state of network connections and allows returning traffic for established sessions','Blocks all traffic by default and requires explicit allow rules for every packet'],correct:1},
+    
+      {q:'What distinguishes a DDoS attack from a DoS attack?',options:['A DDoS uses encrypted traffic to bypass firewalls; a DoS does not','A DoS attack comes from a single source; a DDoS uses many distributed sources — typically a botnet — making it harder to block by IP','A DDoS only targets DNS servers; a DoS can target any service'],correct:1},
+      {q:'ICMP is primarily used for:',options:['Transferring files between servers','Error reporting and network diagnostics — for example, ping uses ICMP echo requests','Encrypting data in transit between two hosts'],correct:1},
+      {q:'A reverse proxy differs from a forward proxy in that it:',options:['Filters outbound requests on behalf of internal clients','Accepts inbound connections on behalf of servers, masking their internal IP from external clients','Creates a VPN tunnel between two corporate sites'],correct:1},
+      {q:'Port 443 is the default port for which protocol?',options:['HTTP — unencrypted web traffic','FTP — file transfer protocol','HTTPS — encrypted web traffic over TLS'],correct:2},
+      {q:'In the TCP/IP model, which layer is responsible for end-to-end error checking and flow control?',options:['Network layer — handles IP addressing and routing','Transport layer — TCP provides reliability, ordering and flow control','Application layer — handles protocols such as HTTP and DNS'],correct:1},
+      {q:'Why is UDP preferred over TCP for real-time streaming applications?',options:['UDP provides guaranteed delivery, making video frames more reliable','UDP has lower overhead — no connection setup or acknowledgements, so latency is lower even if some packets are lost','UDP automatically encrypts data in transit, protecting the stream from interception'],correct:1},
     ]
   }
 };
@@ -203,13 +245,38 @@ MODULES.encryptionAudit = {
   emailSender: ()=>pick(['crypto@secops.internal','key-mgmt@infrasec.net','audit@cryptoteam.io','ciso-office@company.net']),
   emailSubject: ()=>pick(['Cryptographic Audit: Immediate Action Required','Quarterly Encryption Review — Critical Findings','CISO Request: Encryption Health Check','Cryptography Audit Report — Analyst Review Needed']),
   emailBody(){
-    return pick([
-      `Analyst,\n\nOur quarterly cryptographic audit has flagged several systems using outdated or broken algorithms. Some represent an immediate risk; others need scheduling for replacement.\n\nLoad the Encryption Audit Tool. For each system, determine whether the algorithm and key size are still fit for purpose: RED (replace urgently), AMBER (schedule replacement), or GREEN (maintain).\n\nCryptography Team`,
-      `Hi,\n\nFollowing the latest NIST deprecation guidance, we need to audit all encryption across our systems. Some algorithms are now considered cryptographically broken; others are weakening but not yet critical.\n\nUse the Encryption Audit Tool to classify each configuration. Consider algorithm strength, key size and appropriate use case.\n\nKey Management Team`,
-      `Analyst,\n\nWe've had a tip-off that a competitor's breach was linked to weak hashing on their password store. We need to verify our own cryptographic posture before this becomes an issue.\n\nReview each system using the Encryption Audit Tool. Pay particular attention to whether hashing algorithms are being used correctly — a fast hash is not appropriate for passwords.\n\nCISO Office`
-    ]);
+    return 'Analyst,\n\nTechCorp Global processes payments for 500,000 UK customers. '
+      +'With a confirmed breach, we need to assess what cryptographic protections were in place — '
+      +'and whether any inadequacy contributed to the exposure.\n\n'
+      +'The results will determine our ICO notification obligations. '
+      +'If customer passwords were stored with broken hashing, or payment data encrypted with deprecated ciphers, '
+      +'that materially changes the severity of our disclosure.\n\n'
+      +'Load the Encryption Audit Tool and classify each configuration.\n\n'
+      +'CISO Support — TechCorp IR';
   },
-
+  diagnosticSummary:'Encryption transforms data using a key. Symmetric uses one shared key such as AES. Asymmetric uses a public and private key pair such as RSA. Hashing produces a fixed-length one-way digest. MD5 and SHA-1 have known weaknesses. bcrypt is designed for password storage because it is deliberately slow. Key length in bits determines resistance to brute-force attacks.',
+  diagnosticQuestions:[
+    {q:'What does encryption do',opts:['Compresses data for storage','Transforms data into an unreadable form requiring the correct key to reverse','Checks data for errors during transmission'],ok:1,hint:'Encryption provides confidentiality. Only those with the correct key can decrypt and read the data.'},
+    {q:'What makes a hash function one-way',opts:['Data can only flow in one direction through the network','The original input cannot be mathematically derived from the hash output alone','A hash can only be applied once to each piece of data'],ok:1,hint:'You can verify a hash by hashing the input again and comparing but you cannot reverse it to recover the original.'},
+    {q:'What is symmetric encryption',opts:['The algorithm looks the same forwards and backwards','The same key is used to both encrypt and decrypt','Two parties share equal responsibility for encrypting'],ok:1,hint:'Symmetric encryption such as AES is fast and efficient for bulk data. The challenge is securely sharing the single key.'},
+    {q:'AES stands for',opts:['Automated Encryption Standard','Advanced Encryption Standard','Asymmetric Encryption System'],ok:1,hint:'AES is the current industry standard for symmetric encryption. AES-256 with a 256-bit key is the most widely deployed configuration.'},
+    {q:'What is a private key in asymmetric encryption',opts:['A key shared privately with selected users','A secret key known only to its owner used to decrypt data encrypted with the corresponding public key','The master key that generates all others'],ok:1,hint:'Anyone can encrypt with the public key but only the private key holder can decrypt. The private key must never be shared.'},
+    {q:'RSA is an example of',opts:['Symmetric encryption','A hash function','Asymmetric encryption'],ok:2,hint:'RSA uses mathematically linked public and private keys. It is used for key exchange and digital signatures rather than bulk data encryption.'},
+    {q:'A hash function always produces',opts:['Output of variable length depending on input size','A fixed-length output regardless of input size','Output that can be decrypted with the original key'],ok:1,hint:'SHA-256 always produces 256 bits whether the input is one character or one gigabyte. This fixed-length property makes hashes useful as fingerprints.'},
+    {q:'What is a rainbow table',opts:['A chart showing algorithm strengths','A precomputed table of hash values used to reverse hash functions and recover passwords','A list of approved encryption algorithms'],ok:1,hint:'Rainbow tables defeat hash functions by precomputing billions of values. Salting makes them impractical.'},
+    {q:'What is a salt in password hashing',opts:['A requirement that passwords be longer','A unique random value added to each password before hashing ensuring identical passwords produce different hashes','A secondary encryption layer on the hash'],ok:1,hint:'Without salts identical passwords produce identical hashes which rainbow tables trivially reverse. Unique salts make precomputed attacks impractical.'},
+    {q:'Why is MD5 unsuitable for passwords',opts:['MD5 produces hashes that are too short','MD5 is extremely fast to compute enabling rapid brute-force and rainbow table attacks','MD5 is asymmetric and requires two keys'],ok:1,hint:'MD5 can compute billions of hashes per second on modern hardware. Password hashing needs to be deliberately slow — bcrypt and Argon2 are designed for this.'},
+    {q:'What is ciphertext',opts:['Text validated as safe to store','Data that has been encrypted and is unreadable without the correct key','Compressed data ready for transmission'],ok:1,hint:'Plaintext is the original readable data. Ciphertext is what encryption produces. Decryption with the correct key reverses the process.'},
+    {q:'What is end-to-end encryption',opts:['Data encrypted only at the sending end','Data encrypted from sender to recipient so no intermediary can read it','Encryption applied only at the end of a session'],ok:1,hint:'Even if a message passes through a server the provider cannot read it. Only sender and recipient hold the keys.'},
+    {q:'What does a Certificate Authority do',opts:['Encrypts all traffic between client and server','Verifies and digitally signs public keys to establish trust that a key genuinely belongs to who it claims','Generates session keys for HTTPS'],ok:1,hint:'CAs are the trust anchors of HTTPS. Your browser trusts a website because its certificate is signed by a CA your browser already trusts.'},
+    {q:'Key length in encryption refers to',opts:['The number of characters in a password','The number of bits in the encryption key — longer keys have exponentially more possible values making brute force harder','The time needed to generate the key'],ok:1,hint:'Doubling key length squares the number of possible keys. 256-bit AES has 2 to the power of 256 possible keys.'},
+    {q:'Diffie-Hellman allows',opts:['Two parties to verify each other identity','Two parties to agree on a shared secret key over an insecure channel without transmitting the key itself','A server to generate keys for all its clients'],ok:1,hint:'Diffie-Hellman solved the key distribution problem. TLS uses it so every HTTPS session establishes a unique session key.'},
+    {q:'The main advantage of asymmetric over symmetric encryption is',opts:['It is much faster for bulk data','The public key can be distributed freely eliminating the need for a secure channel to share it','It produces shorter ciphertext'],ok:1,hint:'The key distribution problem: how do you securely share a symmetric key? Asymmetric encryption solves this — the public key is public by design.'},
+    {q:'What does encrypting data at rest mean',opts:['Encrypting data only during transmission','Encrypting data stored on disk rather than in transit','Archiving data no longer in active use'],ok:1,hint:'Data at rest on disk and data in transit are both threat surfaces. Full-disk encryption protects against physical theft of storage media.'},
+    {q:'bcrypt is preferred over SHA-256 for passwords because',opts:['bcrypt produces a longer hash','bcrypt is deliberately slow and computationally expensive resisting brute-force while SHA-256 is fast by design and unsuitable for passwords','bcrypt uses asymmetric encryption'],ok:1,hint:'Work factor is the key concept. bcrypt lets you increase computation cost as hardware improves keeping brute-force expensive even as GPUs get faster.'},
+    {q:'What is a digital signature',opts:['An electronic version of a handwritten signature','A cryptographic proof that a message came from who it claims and has not been altered in transit','An encrypted message only the recipient can open'],ok:1,hint:'The sender signs with their private key. Anyone can verify with the public key. Tampering causes verification to fail.'},
+    {q:'Why does TLS combine asymmetric and symmetric encryption',opts:['For compatibility with older systems','Asymmetric encryption establishes a shared session key and symmetric encryption then handles data transfer because it is far faster','TLS requires both for legal compliance'],ok:1,hint:'Asymmetric encryption is too expensive for bulk data. TLS uses it only for key exchange then switches to fast AES symmetric encryption.'}
+  ],
   tools: {
     correct: 'Encryption Audit Tool',
     decoys: ['Packet Capture Analyser','SQL Query Log Viewer','Firewall Rule Manager','Legal Reference Database','Network Traffic Monitor','Process Monitor','Certificate Transparency Log']
@@ -223,7 +290,7 @@ MODULES.encryptionAudit = {
     realWorld: 'In 2012 LinkedIn suffered a breach in which 6.5 million password hashes were posted online. LinkedIn was using unsalted SHA-1 — a fast cryptographic hash with no salt. Attackers cracked the majority of passwords within days using precomputed rainbow tables. By 2016, a full 117 million records from the same breach were being sold. The fix: use bcrypt, scrypt or Argon2 — algorithms designed to be slow and resist precomputation.'
   },
 
-  generateScenario({numItems=6}={}){
+  generateScenario({numItems=6,difficulty=1}={}){
     const pool = [
       // RED — cryptographically broken, replace immediately
       {
@@ -301,9 +368,16 @@ MODULES.encryptionAudit = {
         notes:'SHA-256 is the current standard for integrity verification. Part of the SHA-2 family, it has no known practical attacks. Correct use case — verifying file integrity, not password storage. No action required..'
       },
     ];
-    const nR=pick([1,2,2]);
-    const nA=pick([1,1,2]);
-    const nG=numItems-nR-nA;
+    // Adaptive difficulty — set by Analyst Pre-Brief diagnostic score
+    var nR,nA,nG;
+    if(difficulty===0){           // FOUNDATION: clear-cut cases, minimal edge cases
+      nR=pick([2,2,3]); nA=pick([0,0,1]);
+    } else if(difficulty===2){    // ADVANCED: edge cases dominate, precision required
+      nR=pick([1,1,2]); nA=pick([2,3,3]);
+    } else {                      // STANDARD: balanced mix
+      nR=pick([1,1,2,2,3]); nA=pick([0,1,1,2]);
+    }
+    nG=numItems-nR-nA;
     return _pickPool(pool,nR,nA,Math.max(1,nG));
   },
 
@@ -312,9 +386,14 @@ MODULES.encryptionAudit = {
 
   completionText(_,sc){
     const crit=sc.filter(s=>s.ragAnswer==='R').length;
-    return `<div class="rc info"><h3>ENCRYPTION AUDIT — KEY PRINCIPLES</h3>
-    <p>${crit} critical finding(s) identified. Key distinctions: <strong>symmetric</strong> (AES — one shared key, fast, bulk data) vs <strong>asymmetric</strong> (RSA — public/private pair, slow, key exchange) vs <strong>hashing</strong> (SHA-256, bcrypt — one-way, integrity/passwords).</p>
-    <p style="margin-top:8px;"><strong>Key concepts:</strong> Symmetric encryption (AES — one shared key), asymmetric encryption (RSA — public/private pair), hashing (one-way: SHA-256 for integrity, bcrypt for passwords). Each has distinct use cases.</p></div>`;
+    const weak=sc.filter(s=>s.ragAnswer==='A').length;
+    return `<div class="rc info">
+      <div style="font-family:'Orbitron',monospace;font-size:11px;color:rgba(0,255,65,.5);letter-spacing:.1em;margin-bottom:8px;">📁 TECHCORP IR — ENCRYPTION AUDIT</div>
+      <p style="margin-bottom:8px;"><strong>${crit} critical finding(s)</strong> and ${weak} scheduled replacement(s). ${crit>0?'These configurations represent real exposure — if customer payment data or passwords were protected by the broken algorithms you identified, the breach severity is significantly higher.':'TechCorp\'s cryptographic posture is better than average — the weakening algorithms identified should still be scheduled for replacement.'}</p>
+      <hr style="border-color:rgba(0,255,65,.15);margin:10px 0;">
+      <div style="font-family:'Orbitron',monospace;font-size:10px;color:rgba(0,255,65,.5);letter-spacing:.1em;margin-bottom:6px;">📝 EXAM FOCUS: ENCRYPTION & HASHING</div>
+      <p style="font-size:12px;line-height:1.6;">Examiners test: <strong>symmetric vs asymmetric</strong> (one key vs key pair — know when each is used), <strong>hashing is one-way</strong> (cannot decrypt), <strong>why fast hashes fail for passwords</strong> (rainbow tables), <strong>purpose of salting</strong>. Classic 4-mark question: "Explain why MD5 is not suitable for storing passwords" — model answer covers: (1) fast to compute, (2) enables precomputed rainbow table attacks, (3) no salt = identical passwords produce identical hashes, (4) better alternatives exist (bcrypt, Argon2).</p>
+    </div>`;
   },
 
   actions:{ R:'replace', A:'schedule', G:'maintain' },
@@ -341,6 +420,13 @@ MODULES.encryptionAudit = {
       {q:'AES-256 used to encrypt a backup file is an example of:',options:['Asymmetric encryption — using a public/private key pair','Hashing — producing a one-way digest of the file contents','Symmetric encryption — using a single shared key for both encryption and decryption'],correct:2},
       {q:'Why is asymmetric encryption typically used for key exchange rather than bulk data encryption?',options:['It cannot process data larger than the key size in bits','The mathematical operations (e.g. modular exponentiation of large primes) are significantly slower than symmetric ciphers','Both parties must be online simultaneously for asymmetric encryption to function'],correct:1},
       {q:'A "salt" added to a password before hashing prevents:',options:['The hash from being stored in plaintext in the database','Two identical passwords producing identical hash values — defeating precomputed rainbow table attacks','The password from being transmitted over the network in plaintext'],correct:1},
+    
+      {q:'What additional property does AES-GCM provide compared to AES-CBC?',options:['A longer key length, making brute force harder','Authenticated encryption — it simultaneously provides confidentiality AND verifies data integrity','Faster encryption speed for bulk data processing'],correct:1},
+      {q:'In TLS (used by HTTPS), why is asymmetric encryption used initially but then replaced by symmetric encryption?',options:['Asymmetric encryption is less secure for large amounts of data','Asymmetric encryption establishes a shared symmetric key — symmetric encryption then handles bulk data because it is far faster','The server requires asymmetric encryption for the session but symmetric for the handshake'],correct:1},
+      {q:'What is the purpose of a Certificate Authority (CA)?',options:['To encrypt all traffic between client and server using the CA\'s private key','To verify and digitally sign public keys, establishing trust that a public key genuinely belongs to who it claims to','To generate symmetric encryption keys for HTTPS sessions'],correct:1},
+      {q:'What is a hash collision, and why does it matter for security?',options:['When two encryption keys are identical — breaks the confidentiality of the cipher','When two different inputs produce the same hash output — an attacker could substitute a malicious file without detection','When a hash function takes too long to compute — causing denial of service'],correct:1},
+      {q:'bcrypt is preferred over SHA-256 for password storage because:',options:['bcrypt produces a longer hash output, making it harder to crack','bcrypt is a deliberately slow algorithm designed to resist brute-force attacks; SHA-256 is fast by design and unsuitable for passwords','bcrypt uses asymmetric encryption; SHA-256 only uses symmetric'],correct:1},
+      {q:'What is key stretching (e.g. PBKDF2) used for?',options:['Extending a short encryption key to the required length for the algorithm','Making a password-derived key harder to brute-force by repeatedly applying a hash function thousands of times','Distributing an encryption key securely between two parties'],correct:1},
     ]
   }
 };
@@ -357,13 +443,38 @@ MODULES.sqlInjection = {
   emailSender: ()=>pick(['waf@secops.internal','appsec@infrasec.net','dba@database-ops.io','appsec-alerts@company.net']),
   emailSubject: ()=>pick(['WAF Alert: Potential SQL Injection Attempts Detected','Application Security Alert: Suspicious Database Queries','DBA Notice: Anomalous Input Detected in Application Logs','AppSec P2 Alert: SQL Metacharacters in Form Submissions']),
   emailBody(){
-    return pick([
-      `Analyst,\n\nOur Web Application Firewall has flagged a number of submissions to application endpoints over the last hour. Some contain SQL metacharacters that could indicate injection attempts; others may be legitimate.\n\nLoad the SQL Query Log Viewer. Carefully review the submitted value for each entry — look for SQL keywords, quote characters, comment sequences and tautologies.\n\nApplication Security Team`,
-      `Hi,\n\nThe DBA team have noticed some unusual activity in the application query logs. At least one submission appears to be attempting database enumeration.\n\nUse the SQL Query Log Viewer to triage each logged submission. Consider the endpoint, the input field, and whether the submitted value could modify the intended query structure.\n\nDatabase Operations`,
-      `Analyst,\n\nFollowing last month's breach at a competitor via SQL injection, we're reviewing our own application input logs proactively. Some of these look suspicious; others are false positives from legitimate user input.\n\nReview the WAF log using the SQL Query Log Viewer. Your job is to distinguish genuine attack attempts from legitimate submissions.\n\nAppSec`
-    ]);
+    return 'Analyst,\n\nTechCorp\'s WAF flagged unusual submissions against their payment portal '
+      +'in the hours before the breach was confirmed. '
+      +'SQL injection against a payment application is a serious initial access vector.\n\n'
+      +'If any of these payloads succeeded, it may be how the attacker got in. '
+      +'Evidence of exploitation will be critical for both the technical remediation and the legal investigation — '
+      +'particularly if customer payment data was accessed.\n\n'
+      +'Load the SQL Query Log Viewer and triage each entry.\n\n'
+      +'Application Security Lead — TechCorp IR';
   },
-
+  diagnosticSummary:'Relational databases store data in tables with rows and columns. SQL queries retrieve and modify data. SELECT retrieves rows. WHERE filters them. INSERT INTO adds rows. UPDATE modifies rows. DELETE FROM removes rows. DROP TABLE removes the entire table. Primary keys uniquely identify rows. Foreign keys link tables. Parameterised queries separate SQL code from user input preventing injection.',
+  diagnosticQuestions:[
+    {q:'What does SQL stand for',opts:['Structured Query Language','Secure Query Logic','System Query Library'],ok:0,hint:'SQL is the standard language for relational databases — MySQL, PostgreSQL, SQL Server and others all use it.'},
+    {q:'What is a relational database',opts:['A database that connects computers on a network','A database that organises data into linked tables with rows and columns','A database stored entirely in the cloud'],ok:1,hint:'Relational refers to tables linked by relationships defined through keys. This allows complex queries across related datasets.'},
+    {q:'What does SELECT * FROM users do',opts:['Creates a new users table','Retrieves every column and row from the users table','Deletes all data from the users table'],ok:1,hint:'SELECT retrieves data. The asterisk means all columns. Without WHERE all rows are returned. SQL injection targets SELECT statements to extract data.'},
+    {q:'What is a primary key',opts:['The most important field in a record','A unique identifier for each row that cannot be null and no two rows can share the same value','The administrator password for the database'],ok:1,hint:'Primary keys enforce uniqueness and serve as the reference point for foreign keys in related tables.'},
+    {q:'What does the WHERE clause do',opts:['Specifies where data should be stored','Filters rows based on a specified condition','Joins two tables together'],ok:1,hint:'WHERE is the filtering mechanism. SQL injection typically manipulates WHERE conditions to bypass authentication or extract data.'},
+    {q:'What is a foreign key',opts:['A key from an external system','A field that references the primary key of another table establishing a relationship between them','An encrypted key protecting sensitive columns'],ok:1,hint:'Foreign keys enforce referential integrity. You cannot insert a value that has no matching primary key in the referenced table.'},
+    {q:'What does DELETE FROM do',opts:['Removes the entire database','Removes specific rows matching a condition while keeping the table structure intact','Removes a column from a table'],ok:1,hint:'DELETE without WHERE removes all rows but keeps the table structure. DROP TABLE removes the table itself permanently.'},
+    {q:'DROP TABLE removes',opts:['Specific rows matching a condition','The entire table and all its data permanently','Only the table structure leaving data in place'],ok:1,hint:'DROP TABLE is irreversible without a backup. SQL injection achieving DROP TABLE permanently destroys a dataset.'},
+    {q:'What is referential integrity',opts:['All data is encrypted in the database','Foreign key values must correspond to valid primary keys in the referenced table preventing orphaned records','Each table must have exactly one primary key'],ok:1,hint:'Referential integrity prevents dangling references — an order cannot reference a customer that does not exist.'},
+    {q:'What does UNION do in SQL',opts:['Permanently merges two databases','Combines the results of two SELECT queries into a single result set','Connects to a remote database'],ok:1,hint:'Legitimate use: combining results. SQL injection use: appending attacker-controlled queries to extract data from other tables.'},
+    {q:'What is normalisation in database design',opts:['Formatting all data values consistently','Organising data to reduce redundancy and ensure each fact is stored in one place','Compressing the database to save storage'],ok:1,hint:'Normalisation removes duplicate data. First Second and Third Normal Form are the standard levels.'},
+    {q:'What does a database transaction ensure',opts:['A financial payment has been authorised','A sequence of operations is treated as a single unit — all complete or none do','A query runs within a time limit'],ok:1,hint:'ACID transactions prevent partial updates. A bank transfer that fails midway rolls back entirely.'},
+    {q:'What does ACID stand for',opts:['Access Control Integrity Durability','Atomicity Consistency Isolation Durability','Availability Confidentiality Integrity Distribution'],ok:1,hint:'Atomicity means all-or-nothing. Consistency means valid state is enforced. Isolation means concurrent transactions do not interfere. Durability means committed data persists.'},
+    {q:'What does a database index do',opts:['Numbers all tables in order','Speeds up retrieval by allowing the engine to jump directly to matching records without scanning every row','Backs up recently accessed data'],ok:1,hint:'An index on a frequently searched column can reduce query time from seconds to milliseconds on large tables.'},
+    {q:'What does INSERT INTO do',opts:['Creates a new table','Adds a new row of data to an existing table','Connects to a database server'],ok:1,hint:'INSERT INTO users adds one row. SQL injection can use INSERT to create unauthorised accounts.'},
+    {q:'What is an entity in ER modelling',opts:['A database error to resolve','A real-world object about which data is stored represented as a table','A connection between two servers'],ok:1,hint:'Entities become tables. Customer Order Product are entities. Attributes become columns. Relationships become foreign keys.'},
+    {q:'What is the purpose of data validation',opts:['Encrypting data before saving','Ensuring data meets required constraints such as type format and range before being accepted','Verifying the database is running'],ok:1,hint:'Validation is a first line of defence but parameterised queries are still required — validated input can still contain SQL metacharacters.'},
+    {q:'What does UPDATE do',opts:['Upgrades the database software','Modifies data in one or more existing rows based on a condition','Restores a table from backup'],ok:1,hint:'UPDATE without WHERE modifies every row — a common accidental data destruction scenario. Always include WHERE when targeting specific records.'},
+    {q:'What is a stored procedure',opts:['A backup procedure for the database','A named precompiled SQL block stored in the database that applications call by name','A log of all queries executed'],ok:1,hint:'Stored procedures reduce injection risk because applications call a procedure name with parameters rather than building raw SQL strings.'},
+    {q:'What makes a query vulnerable to SQL injection',opts:['The query uses the SELECT command','User input is directly concatenated into the query string without separation between code and data','The database is stored on a public server'],ok:1,hint:'When user input is embedded in SQL code the attacker can modify the query structure. Parameterised queries fix this structurally.'}
+  ],
   tools: {
     correct: 'SQL Query Log Viewer',
     decoys: ['Packet Capture Analyser','Encryption Audit Tool','Firewall Rule Manager','Legal Reference Database','Network Traffic Monitor','Process Monitor','Email Header Analyser']
@@ -377,7 +488,7 @@ MODULES.sqlInjection = {
     realWorld: "In 2008 Heartland Payment Systems suffered one of the largest card breaches in history: 130 million credit card numbers stolen via SQL injection against a vulnerable web form. A single unparameterised query allowed attackers to install a packet sniffer on the payment network. Heartland paid over $140 million in settlements. The fix — parameterised queries — would have cost virtually nothing to implement."
   },
 
-  generateScenario({numItems=6}={}){
+  generateScenario({numItems=6,difficulty=1}={}){
     const pool = [
       // RED — clear SQL injection attacks
       {
@@ -467,9 +578,16 @@ MODULES.sqlInjection = {
         notes:"Normal integer product ID. No SQL metacharacters, rate is consistent with a user viewing product pages. Allow."
       },
     ];
-    const nR=pick([1,2,2,3]);
-    const nA=pick([0,1,1,2]);
-    const nG=numItems-nR-nA;
+    // Adaptive difficulty — set by Analyst Pre-Brief diagnostic score
+    var nR,nA,nG;
+    if(difficulty===0){           // FOUNDATION: clear-cut cases, minimal edge cases
+      nR=pick([2,2,3]); nA=pick([0,0,1]);
+    } else if(difficulty===2){    // ADVANCED: edge cases dominate, precision required
+      nR=pick([1,1,2]); nA=pick([2,3,3]);
+    } else {                      // STANDARD: balanced mix
+      nR=pick([1,1,2,2,3]); nA=pick([0,1,1,2]);
+    }
+    nG=numItems-nR-nA;
     return _pickPool(pool,nR,nA,Math.max(1,nG));
   },
 
@@ -477,10 +595,14 @@ MODULES.sqlInjection = {
   reportHint: 'SQL injection targets the database layer — which team owns application security and database administration?',
 
   completionText(_,sc){
-    const att=sc.filter(s=>s.ragAnswer!=='G').length;
-    return `<div class="rc info"><h3>SQL INJECTION — KEY PRINCIPLES</h3>
-    <p>${att} suspicious submission(s) identified. The fix is always <strong>parameterised queries</strong> (prepared statements): SQL code and user data are sent separately, making injection structurally impossible regardless of what characters the user submits.</p>
-    <p style="margin-top:8px;"><strong>Key concepts:</strong> SQL syntax (SELECT, DROP, UNION), injection attack vectors, parameterised queries as the fix, relational database concepts (primary/foreign keys, normalisation, ACID transactions).</p></div>`;
+    const att=sc.filter(s=>s.ragAnswer==='R').length;
+    return `<div class="rc info">
+      <div style="font-family:'Orbitron',monospace;font-size:11px;color:rgba(0,255,65,.5);letter-spacing:.1em;margin-bottom:8px;">📁 TECHCORP IR — WAF LOG ANALYSIS</div>
+      <p style="margin-bottom:8px;"><strong>${att} injection attempt(s)</strong> identified in this capture window. ${att>0?'Any successful injection against TechCorp\'s payment portal could represent the initial access vector for the entire breach. Parameterised queries on every endpoint would have prevented all of these.':'No confirmed injection in this window — though the suspicious probes indicate the attacker was testing input handling.'}</p>
+      <hr style="border-color:rgba(0,255,65,.15);margin:10px 0;">
+      <div style="font-family:'Orbitron',monospace;font-size:10px;color:rgba(0,255,65,.5);letter-spacing:.1em;margin-bottom:6px;">📝 EXAM FOCUS: DATABASES & SQL SECURITY</div>
+      <p style="font-size:12px;line-height:1.6;">Examiners test: <strong>how SQL injection works</strong> (user input modifies query structure), <strong>parameterised queries as the fix</strong> (code and data separated structurally), <strong>SQL syntax</strong> (SELECT/WHERE/DROP/UNION), <strong>database concepts</strong> (primary/foreign keys, normalisation, ACID). A 6-mark "explain" question on SQL injection typically expects: mechanism, example, why it succeeds, the defence, and why the defence works.</p>
+    </div>`;
   },
 
   actions:{ R:'block', A:'investigate', G:'allow' },
@@ -507,6 +629,13 @@ MODULES.sqlInjection = {
       {q:'A web endpoint returns HTTP 500 Internal Server Error immediately after a form submission containing a single apostrophe. A security analyst should consider this:',options:['Normal — apostrophes in names like O\'Brien commonly cause formatting issues','A strong indicator of SQL injection vulnerability — the apostrophe broke the query syntax and the database returned an unhandled error','An indication that the server is under DDoS attack'],correct:1},
       {q:"Which of the following inputs is the most dangerous to pass to a login form that concatenates user input directly into a SQL query?",options:["A very long string of repeating characters (aaaaaaaaaa...)","The value: ' OR 1=1; DROP TABLE users; --","A valid email address containing a + character"],correct:1},
       {q:'The only fully reliable defence against SQL injection is:',options:['Filtering and blocking all inputs containing single quotes or SQL keywords','Using parameterised queries — structurally separating SQL code from user data so that input cannot alter query logic regardless of content','Hashing all user input before it reaches the database layer'],correct:1},
+    
+      {q:'What does the following SQL return?\nSELECT * FROM users WHERE username = \'admin\' AND active = 1',options:['Every row in the users table','All columns for rows where username is admin and the account is active','Deletes the admin user from the users table'],correct:1},
+      {q:'Which SQL command would retrieve the name and salary of every employee earning over £30,000?',options:['SELECT name, salary FROM employees WHERE salary > 30000','GET name, salary FROM employees IF salary > 30000','FIND name, salary IN employees WHERE salary ABOVE 30000'],correct:0},
+      {q:'What is referential integrity in a relational database?',options:['All data in the database is encrypted and cannot be accessed without the correct key','Foreign key values must correspond to a valid primary key in the referenced table — preventing orphaned records','Each table has exactly one primary key column'],correct:1},
+      {q:'A database in Third Normal Form (3NF) is designed to eliminate:',options:['Duplicate primary keys across tables','Transitive dependencies — every non-key attribute must depend only on the primary key, not on other non-key attributes','Tables with more than three columns'],correct:1},
+      {q:'The SQL command DELETE FROM orders WHERE order_id = 42 differs from DROP TABLE orders in that it:',options:['Removes one row while preserving the table structure; DROP removes the table and all data permanently','Is reversible with an UNDO command; DROP is permanent','Requires administrator privileges; DROP can be executed by any user'],correct:0},
+      {q:'What does ACID stand for in database transaction processing, and why does it matter for a payment system?',options:['Access, Control, Integrity, Durability — ensures only authorised users can run transactions','Atomicity, Consistency, Isolation, Durability — ensures payment transactions either complete fully or not at all, preventing partial transfers','Availability, Confidentiality, Integrity, Distribution — the core security properties of a database'],correct:1},
     ]
   }
 };
@@ -523,13 +652,39 @@ MODULES.firewallReview = {
   emailSender: ()=>pick(['change-mgmt@infrasec.net','network-ops@company.net','noc@security.internal','it-change@company.net']),
   emailSubject: ()=>pick(['Change Requests: Firewall Rule Amendments — Analyst Approval Required','Network Change Management: Firewall Rules Awaiting Triage','IT Change Board: Firewall Rule Review Pending','NOC: Proposed Firewall Changes — Security Sign-Off Needed']),
   emailBody(){
-    return pick([
-      `Analyst,\n\nSeveral firewall rule change requests have been submitted this week. Some are routine and straightforward; others require careful scrutiny before approval.\n\nLoad the Firewall Rule Manager. For each request, assess whether the proposed change is safe to approve, needs escalation for further review, or should be rejected as a security risk.\n\nApply the principle of least privilege: access should be granted only where there is a clear, justified business need.\n\nNetwork Operations`,
-      `Hi,\n\nChange Management have queued a batch of firewall rule requests. I need a second set of eyes on these before they go to the Change Board.\n\nSome look fine; a couple I'm concerned about. Use the Firewall Rule Manager to assess each one. Key questions: is this port/protocol combination safe? Is the justification specific and plausible? Could this be more tightly scoped?\n\nSecurity Architecture`,
-      `Analyst,\n\nFollowing last quarter's red team exercise — which used an overly-permissive outbound rule as a C2 channel — we're applying closer scrutiny to all firewall change requests.\n\nReview the queued changes using the Firewall Rule Manager. Reject anything that unnecessarily expands the attack surface. Escalate anything ambiguous.\n\nCISO Office`
-    ]);
+    return 'Analyst,\n\nTechCorp\'s change management system shows firewall rule requests '
+      +'submitted in the 48 hours before the breach. At least one looks suspicious — '
+      +'it may have been submitted by the attacker to create an access pathway, '
+      +'or by a compromised insider.\n\n'
+      +'Any change that should have been rejected represents a control failure. '
+      +'We need to identify exactly what was approved, what should have been escalated, '
+      +'and what gave the attacker their foothold.\n\n'
+      +'Load the Firewall Rule Manager.\n\n'
+      +'Change Advisory Board — TechCorp IR';
   },
-
+  diagnosticSummary:'Firewalls filter traffic by protocol, port, direction and IP. Key ports: 22 SSH, 80 HTTP, 443 HTTPS, 3389 RDP, 3306 MySQL. Principle of least privilege means granting only minimum access needed. A DMZ places public-facing servers between internet and internal network. CIDR /32=one IP, /24=256 IPs, /0=all IPs. Implicit deny means anything not explicitly permitted is blocked.',
+  diagnosticQuestions:[
+    {q:'What is a firewall primary function',opts:['To speed up internet connections','To monitor and filter network traffic based on security rules','To encrypt all data on the network'],ok:1,hint:'Firewalls are gatekeepers. They permit or deny traffic based on rules — anything not matching a permit rule should be blocked.'},
+    {q:'What is a network port',opts:['A physical socket on a switch','A logical endpoint identified by a number distinguishing different services on the same device','An opening in the firewall allowing all traffic'],ok:1,hint:'Well-known ports (0-1023) are reserved for standard services. Port numbers route incoming traffic to the correct application.'},
+    {q:'What does inbound traffic mean',opts:['Traffic from the local device going out','Traffic arriving at the network from an external source','Traffic circulating within the internal network'],ok:1,hint:'Inbound is traffic arriving. Outbound is traffic leaving. Firewall rules typically restrict inbound more strictly.'},
+    {q:'What does the principle of least privilege mean',opts:['New staff receive minimum pay during probation','Users and systems should have only the minimum access rights necessary for their function','Less-used systems should have the most restrictive settings'],ok:1,hint:'Least privilege minimises the blast radius of a compromise. A breached account with minimal permissions causes minimal damage.'},
+    {q:'What is a DMZ in networking',opts:['A restricted zone in a server room','A network segment between the internet and internal network hosting public-facing services','A type of guest wireless network'],ok:1,hint:'The DMZ allows web servers to be internet-accessible without exposing internal systems. A compromised DMZ host cannot directly reach internal databases.'},
+    {q:'What does 0.0.0.0/0 mean in a firewall rule',opts:['No traffic is permitted','The entire internet — every possible source IP address','Only the local subnet'],ok:1,hint:'CIDR /0 means zero bits are fixed — it matches all addresses. A rule permitting 0.0.0.0/0 opens access from the entire internet.'},
+    {q:'What does SSH (port 22) allow',opts:['Sharing files between computers','Encrypted remote command-line access to a server','Sending encrypted email between servers'],ok:1,hint:'SSH is how administrators manage servers remotely. Port 22 exposed to the internet invites brute-force attacks.'},
+    {q:'What is a stateful firewall',opts:['A firewall that stores user credentials','A firewall that tracks connection state permitting return traffic for established connections','A firewall that remembers connected user names'],ok:1,hint:'Stateful inspection tracks which connections are legitimate. Return packets are permitted automatically without needing explicit inbound rules.'},
+    {q:'What does implicit deny mean',opts:['Traffic is encrypted when no matching rule exists','Any traffic not explicitly permitted by a rule is blocked by default','Peak-hour traffic is automatically denied'],ok:1,hint:'Implicit deny is the foundation of secure firewall design. Rules explicitly permit what is needed — everything else is blocked.'},
+    {q:'What is RDP (port 3389) used for',opts:['Routing data between networks','Remotely controlling a computer desktop interface','Encrypting database connections'],ok:1,hint:'RDP exposed to the internet is one of the most common ransomware entry points. Attackers brute-force RDP credentials then deploy ransomware.'},
+    {q:'What is network segmentation',opts:['Dividing a network cable into sections','Dividing a network into isolated zones to limit lateral movement after a compromise','Allocating bandwidth evenly across devices'],ok:1,hint:'Segmentation is defence-in-depth. A compromised device in one zone cannot freely reach servers in another.'},
+    {q:'What does NAT do',opts:['Translates domain names to IP addresses','Maps private internal IP addresses to a public IP allowing multiple devices to share one public address','Encrypts IP packets in transit'],ok:1,hint:'NAT hides internal IP addresses as a side effect. External observers see only the public IP not which internal device sent the traffic.'},
+    {q:'Why is Telnet insecure',opts:['It is too slow for modern networks','It transmits all data including passwords in plaintext making credentials easy to intercept','It requires a dedicated hardware certificate'],ok:1,hint:'Telnet was designed before security was a priority. SSH was created to replace it with encrypted communication.'},
+    {q:'An IPS differs from an IDS in that',opts:['An IPS only detects while an IDS blocks','An IPS actively blocks detected malicious traffic while an IDS only alerts and logs','An IPS works at layer 7 while an IDS works at layer 3'],ok:1,hint:'IDS means detect and alert. IPS means detect and prevent. IPS is placed inline in the traffic path.'},
+    {q:'What does a WAF do',opts:['A firewall that only protects websites','A firewall that inspects HTTP/S content for application-layer attacks such as SQL injection','A firewall built into a web browser'],ok:1,hint:'A WAF operates at layer 7 analysing web request content. It can block SQL injection and XSS that network firewalls cannot see.'},
+    {q:'What does CIDR /24 mean',opts:['24 devices are allowed through the firewall','The first 24 bits are fixed giving a subnet of 256 addresses','24 ports are open on the target'],ok:1,hint:'CIDR /24 = 256 IPs. /32 = one specific IP. /16 = 65536 IPs. /0 = all IPs. Understanding CIDR is essential for evaluating firewall rules.'},
+    {q:'What is a VPN',opts:['A network using virtual machines only','An encrypted tunnel for secure communication over an untrusted network','A private network with no internet connection'],ok:1,hint:'VPNs create an encrypted tunnel. Data inside looks like gibberish to any observer. Used for remote access and connecting offices securely.'},
+    {q:'What is a proxy server used for in a corporate network',opts:['To back up browsing data','To handle outbound requests on behalf of clients enabling filtering logging and caching','To assign IP addresses to devices'],ok:1,hint:'Corporate proxies filter web access, block malicious sites, log activity for compliance and cache content to save bandwidth.'},
+    {q:'What does outbound filtering achieve',opts:['Blocks all data leaving the network','Restricts what data can leave the network helping detect data exfiltration and malware C2 traffic','Filters spam from outbound email only'],ok:1,hint:'Outbound filtering catches malware calling home to C2 servers and employees exfiltrating data.'},
+    {q:'What is port 3306 associated with',opts:['RDP Remote Desktop Protocol','MySQL database server','SMTP email sending'],ok:1,hint:'MySQL uses port 3306. Database servers should only accept connections from the application server on the same internal network.'}
+  ],
   tools: {
     correct: 'Firewall Rule Manager',
     decoys: ['Packet Capture Analyser','Encryption Audit Tool','SQL Query Log Viewer','Legal Reference Database','Process Monitor','Email Header Analyser','Certificate Checker']
@@ -543,7 +698,7 @@ MODULES.firewallReview = {
     realWorld: 'The 2020 SolarWinds supply chain attack exploited a legitimate firewall rule permitting the Orion monitoring software to make outbound HTTP connections to the internet. Attackers embedded a backdoor in a software update and used this rule as a covert C2 channel — the rule was never questioned because it appeared routine. Over 18,000 organisations were compromised before the attack was detected months later.'
   },
 
-  generateScenario({numItems=6}={}){
+  generateScenario({numItems=6,difficulty=1}={}){
     const pool = [
       // RED — reject immediately
       {
@@ -615,9 +770,16 @@ MODULES.firewallReview = {
         notes:'A mail relay in the DMZ accepting inbound SMTP on port 25 from the internet is standard email infrastructure. The relay should be isolated in the DMZ and forward only to the internal mail server. This is expected and correctly scoped. Approve.'
       },
     ];
-    const nR=pick([1,2,2]);
-    const nA=pick([1,1,2]);
-    const nG=numItems-nR-nA;
+    // Adaptive difficulty — set by Analyst Pre-Brief diagnostic score
+    var nR,nA,nG;
+    if(difficulty===0){           // FOUNDATION: clear-cut cases, minimal edge cases
+      nR=pick([2,2,3]); nA=pick([0,0,1]);
+    } else if(difficulty===2){    // ADVANCED: edge cases dominate, precision required
+      nR=pick([1,1,2]); nA=pick([2,3,3]);
+    } else {                      // STANDARD: balanced mix
+      nR=pick([1,1,2,2,3]); nA=pick([0,1,1,2]);
+    }
+    nG=numItems-nR-nA;
     return _pickPool(pool,nR,nA,Math.max(1,nG));
   },
 
@@ -626,9 +788,14 @@ MODULES.firewallReview = {
 
   completionText(_,sc){
     const rej=sc.filter(s=>s.ragAnswer==='R').length;
-    return `<div class="rc info"><h3>FIREWALL REVIEW — KEY PRINCIPLES</h3>
-    <p>${rej} rule(s) rejected. Core principle: <strong>principle of least privilege</strong> — grant only the minimum access required. Every rule that opens a port increases the attack surface. Reject before Escalate before Approve.</p>
-    <p style="margin-top:8px;"><strong>Key concepts:</strong> Principle of least privilege, stateful vs stateless firewalls, DMZ architecture, high-risk ports (22/SSH, 3389/RDP, 23/Telnet), 0.0.0.0/0 meaning any internet address.</p></div>`;
+    const esc=sc.filter(s=>s.ragAnswer==='A').length;
+    return `<div class="rc info">
+      <div style="font-family:'Orbitron',monospace;font-size:11px;color:rgba(0,255,65,.5);letter-spacing:.1em;margin-bottom:8px;">📁 TECHCORP IR — CHANGE REQUEST AUDIT</div>
+      <p style="margin-bottom:8px;"><strong>${rej} rule(s) should have been rejected</strong>, ${esc} escalated for further review. ${rej>0?'At least one of these approved changes may have given the attacker their initial network foothold — this is a control failure that will feature in the post-incident report.':'The change management process held up — but several requests needed tighter scoping.'}</p>
+      <hr style="border-color:rgba(0,255,65,.15);margin:10px 0;">
+      <div style="font-family:'Orbitron',monospace;font-size:10px;color:rgba(0,255,65,.5);letter-spacing:.1em;margin-bottom:6px;">📝 EXAM FOCUS: FIREWALLS, PROXIES & NETWORK SECURITY</div>
+      <p style="font-size:12px;line-height:1.6;">Examiners test: <strong>stateless vs stateful firewalls</strong> (packet filter vs connection tracking), <strong>DMZ architecture</strong> (why public-facing services are separated), <strong>principle of least privilege</strong>, <strong>proxies vs firewalls</strong> (what each controls). A common 4-mark question: "Explain the role of a DMZ in network security" — model answer: (1) subnetwork between internet and internal network, (2) hosts public-facing services, (3) limits blast radius if server is compromised, (4) traffic must be explicitly permitted inward.</p>
+    </div>`;
   },
 
   actions:{ R:'reject', A:'escalate', G:'approve' },
@@ -655,6 +822,13 @@ MODULES.firewallReview = {
       {q:'A forward proxy in a corporate network:',options:['Accepts inbound internet connections on behalf of a web server, masking the server\'s internal IP','Makes outbound requests on behalf of internal clients, masking their internal IP addresses from external servers','Replaces the function of the internal DNS server for hostname resolution'],correct:1},
       {q:'A stateful firewall differs from a stateless packet filter in that it:',options:['Only examines the source/destination IP and port number of each packet in isolation','Tracks the state of connections and automatically allows return traffic for established sessions','Blocks all inbound traffic by default and must be explicitly told to permit every packet'],correct:1},
       {q:'A next-generation firewall (NGFW) provides capabilities beyond a traditional firewall, including:',options:['Physical network switch functionality and VLAN management','Deep packet inspection, application-layer awareness and integrated intrusion detection/prevention','Wireless access point management and spectrum analysis'],correct:1},
+    
+      {q:'What is implicit deny in a firewall ruleset?',options:['Traffic from unknown IP addresses is automatically encrypted','Any traffic not explicitly permitted by a rule is blocked by default — the firewall denies unless told to allow','The firewall denies all traffic during peak hours to prevent overload'],correct:1},
+      {q:'How does network segmentation improve security?',options:['It encrypts all traffic between network segments automatically','It limits lateral movement — if one segment is compromised, the attacker cannot freely access other segments','It doubles the number of available IP addresses on the network'],correct:1},
+      {q:'An intrusion prevention system (IPS) differs from an intrusion detection system (IDS) in that it:',options:['Detects attacks and logs them for later analysis; IDS does not detect attacks','Actively blocks detected malicious traffic; an IDS only alerts — it does not take action','Operates at the application layer; IDS operates at the network layer'],correct:1},
+      {q:'What is NAT (Network Address Translation) and what incidental security benefit does it provide?',options:['NAT encrypts IP packets in transit, preventing eavesdropping on internal communications','NAT maps private internal IP addresses to a public IP — as a side effect, internal IP addresses are hidden from external networks','NAT automatically blocks all inbound connections, functioning as a basic firewall'],correct:1},
+      {q:'Why is Telnet (port 23) considered a critical security risk for server management?',options:['Telnet is too slow for modern high-bandwidth networks, causing timeouts','Telnet transmits all data including passwords in plaintext — any network observer can capture credentials','Telnet requires a dedicated hardware certificate that most servers no longer support'],correct:1},
+      {q:'A web application firewall (WAF) differs from a network firewall in that it:',options:['Operates at a higher network layer and inspects HTTP traffic content, including request parameters, for attack signatures','Operates at the network layer and filters by IP address and port only','Only works for HTTPS traffic; network firewalls handle all protocols'],correct:0},
     ]
   }
 };
@@ -675,13 +849,38 @@ MODULES.legalCompliance = {
   emailSender: ()=>pick(['compliance@company.net','legal@company.net','ciso@company.net','hr-legal@company.net']),
   emailSubject: ()=>pick(['Compliance Review: Reported Incidents Require Legal Assessment','Legal Team: Incident Log — Analyst Classification Needed','CISO Office: Computing Law Incidents Awaiting Triage','HR & Legal: Incident Reports — Legislation Mapping Required']),
   emailBody(){
-    return pick([
-      `Analyst,\n\nA batch of reported incidents has been escalated to the compliance team. Each requires classification under the relevant computing legislation before we can determine the appropriate response.\n\nLoad the Legal Reference Database. For each incident, identify which law applies and determine the correct action: notify police (criminal offense), report to the ICO (data protection breach), or handle internally (policy violation).\n\nCompliance Team`,
-      `Hi,\n\nFollowing advice from our legal team, we're tightening our incident classification process. Several recent reports have been escalated incorrectly — either to the wrong authority or not at all.\n\nPlease review each incident using the Legal Reference Database. Apply the correct legislation: CMA 1990 (S1, S2, S3), DPA 1998, CDPA 1988, or RIPA 2000 as appropriate.\n\nCISO Office`,
-      `Analyst,\n\nWe've received a mix of reported incidents this week. Some may constitute criminal offences; others are data protection issues requiring ICO notification; and some are internal matters only.\n\nCorrectly classifying each incident is important — under-reporting a criminal offence is itself a risk, and over-reporting wastes enforcement resources. Use the Legal Reference Database.\n\nLegal & Compliance`
-    ]);
+    return 'Analyst,\n\nWith TechCorp Global\'s breach confirmed, legal are under immediate pressure. '
+      +'The DPA 1998 notification obligation to the ICO runs from the point of awareness — '
+      +'that clock is already ticking.\n\n'
+      +'We need each incident classified correctly: criminal offences to the police under the CMA, '
+      +'data protection breaches to the ICO, policy violations handled internally. '
+      +'Misclassifying a criminal act as an internal matter is itself a serious liability.\n\n'
+      +'Load the Legal Reference Database.\n\n'
+      +'Legal Director — TechCorp Global';
   },
-
+  diagnosticSummary:'Four UK Acts. Computer Misuse Act 1990 (CMA) is criminal: Section 1 unauthorised access 2 years max, Section 2 access with intent 5 years, Section 3 impairment and malware 10 years. Data Protection Act 1998 (DPA) is regulatory enforced by the ICO. CDPA 1988 covers software copyright. RIPA 2000 covers interception of communications and is criminal. CMA and RIPA go to police. DPA goes to ICO.',
+  diagnosticQuestions:[
+    {q:'What does CMA stand for',opts:['Computer Management Act','Computer Misuse Act','Cybercrime and Misconduct Act'],ok:1,hint:'The Computer Misuse Act 1990 is the primary UK criminal law covering unauthorised access to computer systems.'},
+    {q:'What is the ICO',opts:['The International Computing Organisation','The Information Commissioner Office — the UK data protection regulator','The Internet Content Oversight authority'],ok:1,hint:'The ICO enforces the DPA and GDPR in the UK. It can investigate complaints, issue enforcement notices and impose fines.'},
+    {q:'What is unauthorised access under the CMA',opts:['Accessing a computer without knowing the password','Accessing a computer system without permission from its owner or operator','Accessing a computer outside working hours'],ok:1,hint:'The CMA does not require malicious intent for Section 1. Simply accessing without permission is a criminal offence.'},
+    {q:'What is personal data under UK law',opts:['Any data stored on a personal device','Any information relating to an identified or identifiable living individual','Data a person has created themselves'],ok:1,hint:'Personal data includes names, email addresses, IP addresses and location data — anything that directly or indirectly identifies a living person.'},
+    {q:'What distinguishes criminal from civil law',opts:['Criminal covers minor offences civil covers serious ones','Criminal law involves the state prosecuting wrongdoing civil law involves disputes between private parties','Civil applies to businesses criminal applies to individuals'],ok:1,hint:'Criminal prosecution can result in imprisonment. The CMA creates criminal offences prosecuted by the state.'},
+    {q:'What does the CDPA protect',opts:['The right to copy published works for personal use','Creators exclusive rights over original works including software as a literary work','A fee paid for commercial content use'],ok:1,hint:'CDPA 1988 treats software as a literary work. Copying distributing or modifying without a licence is copyright infringement.'},
+    {q:'What does DPA Principle 1 require',opts:['Data must be deleted after 30 days','Data must be processed lawfully fairly and transparently','Data must be stored only in the UK'],ok:1,hint:'The DPA 1998 has eight principles. Principle 1 (lawful and fair) and Principle 5 (not kept longer than necessary) appear most often in exam scenarios.'},
+    {q:'What is a data breach',opts:['A hacker accessing government systems','A security incident where protected data is accessed disclosed or destroyed without authorisation','When a database backup fails'],ok:1,hint:'Data breaches include accidental disclosure, theft of a laptop and misconfigured cloud storage — not just hacking.'},
+    {q:'What does RIPA regulate',opts:['Remote access to company computers','The interception of communications in transit','The retention of personal data'],ok:1,hint:'RIPA 2000 covers lawful interception. Monitoring employee emails without proper authority may breach RIPA even if the employer owns the system.'},
+    {q:'CMA Section 3 covers',opts:['Accessing a computer without permission','Accessing with intent to commit further offences','Unauthorised acts that impair or disrupt computer systems including deploying malware — maximum 10 years'],ok:2,hint:'S3 carries the heaviest sentence reflecting the severity of attacks that destroy data, install malware or disrupt critical infrastructure.'},
+    {q:'Which body handles criminal CMA offences',opts:['The ICO','The police and Crown Prosecution Service','The FCA'],ok:1,hint:'CMA offences are crimes investigated by the police and prosecuted by the CPS. The ICO handles DPA regulatory breaches.'},
+    {q:'What does the CDPA protect in relation to software',opts:['Software patents covering the ideas behind the code','Software copyright treating programs as literary works protected from copying without licence','Software trademarks covering names and logos'],ok:1,hint:'CDPA 1988 means copying software without a licence infringes copyright. Commercial piracy can involve criminal liability.'},
+    {q:'What is an acceptable use policy',opts:['A policy restricting internet speed for personal use','A policy defining what employees may and may not do with company IT systems','A list of approved software licences'],ok:1,hint:'Violating an AUP is typically an internal disciplinary matter unless it also breaches criminal law such as the CMA.'},
+    {q:'What is informed consent in data collection',opts:['Telling users about collection in the small print','Users actively agreeing after being clearly informed what their data will be used for','Staff being trained on data handling'],ok:1,hint:'Consent must be freely given, specific, informed and unambiguous. Pre-ticked boxes do not constitute valid consent.'},
+    {q:'What does DPA Principle 7 require',opts:['Data must be kept accurate and up to date','Appropriate technical and organisational security measures must protect personal data','Data must only be used for its original purpose'],ok:1,hint:'Principle 7 is directly relevant to cybersecurity. Organisations suffering breaches due to inadequate security may face ICO enforcement.'},
+    {q:'What is a regulatory fine',opts:['A penalty imposed by a criminal court','A financial penalty imposed by a regulator on an organisation that has broken rules','A charge paid to use a regulated service'],ok:1,hint:'ICO fines under DPA 1998 were capped at 500000 pounds. Under GDPR they can reach 20 million euros or 4 percent of global annual turnover.'},
+    {q:'CMA Section 2 adds what to Section 1',opts:['The attacker must have caused financial damage','The access must be with intent to commit or facilitate a further criminal offence','The attacker must have modified data'],ok:1,hint:'S2 equals S1 plus further criminal intent. Accessing a system to steal credentials for fraud is S2. Maximum sentence 5 years.'},
+    {q:'What is lawful authority for intercepting communications',opts:['Having admin access to an email server','Legal permission such as a court order or statutory authorisation to intercept communications','Being employed by a communications company'],ok:1,hint:'RIPA requires lawful authority. Employers monitoring staff communications need to comply with RIPA and the DPA.'},
+    {q:'Copying software without a licence may breach',opts:['CMA 1990','RIPA 2000','CDPA 1988'],ok:2,hint:'CDPA 1988 treats software as a literary work. Copying without a licence is copyright infringement.'},
+    {q:'What does data minimisation mean',opts:['Storing data in the smallest possible file format','Collecting only the data necessary for the specified purpose — no more','Deleting all data after each transaction'],ok:1,hint:'Data you do not hold cannot be stolen or misused. Minimisation reduces both privacy risk and breach impact.'}
+  ],
   tools: {
     correct: 'Legal Reference Database',
     decoys: ['Packet Capture Analyser','Encryption Audit Tool','SQL Query Log Viewer','Firewall Rule Manager','Process Monitor','Email Header Analyser','Vulnerability Scanner']
@@ -695,7 +894,7 @@ MODULES.legalCompliance = {
     realWorld: 'The CMA 1990 has been used in prosecutions ranging from a disgruntled employee deleting company files (S3) to a researcher who accessed a company database without authorisation even to expose a vulnerability (S1 — intent is irrelevant). In 2018, Facebook was fined £500,000 (the maximum under DPA 1998) by the ICO for the Cambridge Analytica scandal — demonstrating the DPA\'s enforcement reach. GDPR (2018) superseded and extended DPA 1998 with far higher maximum fines — but the four Acts above remain the foundation of UK computing law.'
   },
 
-  generateScenario({numItems=6}={}){
+  generateScenario({numItems=6,difficulty=1}={}){
     const pool = [
       // RED — criminal offences, report to police
       {
@@ -767,9 +966,16 @@ MODULES.legalCompliance = {
         notes:'Testing on a company-owned test environment the trainee was authorised to use does not constitute unauthorised access (CMA S1 requires no authorisation). No data was at risk. However, this should have been approved in advance. Agree a responsible disclosure / learning process. Internal matter — no criminal referral.'
       },
     ];
-    const nR=pick([1,2,2,3]);
-    const nA=pick([1,1,2]);
-    const nG=numItems-nR-nA;
+    // Adaptive difficulty — set by Analyst Pre-Brief diagnostic score
+    var nR,nA,nG;
+    if(difficulty===0){           // FOUNDATION: clear-cut cases, minimal edge cases
+      nR=pick([2,2,3]); nA=pick([0,0,1]);
+    } else if(difficulty===2){    // ADVANCED: edge cases dominate, precision required
+      nR=pick([1,1,2]); nA=pick([2,3,3]);
+    } else {                      // STANDARD: balanced mix
+      nR=pick([1,1,2,2,3]); nA=pick([0,1,1,2]);
+    }
+    nG=numItems-nR-nA;
     return _pickPool(pool,nR,nA,Math.max(1,nG));
   },
 
@@ -779,9 +985,13 @@ MODULES.legalCompliance = {
   completionText(_,sc){
     const crim=sc.filter(s=>s.ragAnswer==='R').length;
     const reg=sc.filter(s=>s.ragAnswer==='A').length;
-    return `<div class="rc info"><h3>LEGAL REVIEW — KEY LEGISLATION</h3>
-    <p>${crim} criminal offence(s), ${reg} regulatory breach(es). CMA 1990 S1/S2/S3 = police. DPA 1998 breach = ICO. CDPA/policy violation = internal. RIPA 2000 interception = police.</p>
-    <p style="margin-top:8px;"><strong>Key legislation:</strong> Computer Misuse Act 1990 (S1/S2/S3 — unauthorised access to impairment, police), Data Protection Act 1998 (personal data principles, ICO), RIPA 2000 (interception, police), CDPA 1988 (software copyright, internal/civil).</p></div>`;
+    return `<div class="rc info">
+      <div style="font-family:'Orbitron',monospace;font-size:11px;color:rgba(0,255,65,.5);letter-spacing:.1em;margin-bottom:8px;">📁 TECHCORP IR — LEGAL ASSESSMENT</div>
+      <p style="margin-bottom:8px;"><strong>${crim} criminal offence(s)</strong> (police notification required), <strong>${reg} regulatory breach(es)</strong> (ICO notification required). ${crim>0?'TechCorp must notify law enforcement immediately — delays in reporting criminal offences create additional legal exposure.':'No criminal offences confirmed in this case set, but the regulatory breaches still carry significant ICO enforcement risk.'}</p>
+      <hr style="border-color:rgba(0,255,65,.15);margin:10px 0;">
+      <div style="font-family:'Orbitron',monospace;font-size:10px;color:rgba(0,255,65,.5);letter-spacing:.1em;margin-bottom:6px;">📝 EXAM FOCUS: COMPUTING LEGISLATION</div>
+      <p style="font-size:12px;line-height:1.6;">Examiners test <strong>four Acts</strong>: CMA 1990 (S1 unauthorised access 2yr / S2 access with intent 5yr / S3 impairment 10yr), DPA 1998 (8 principles, ICO enforcement), CDPA 1988 (software as literary work), RIPA 2000 (interception). Scenario questions ask you to identify which Act applies — the trick is distinguishing CMA (computer access) from DPA (personal data) from RIPA (communication interception). Know all four Acts cold.</p>
+    </div>`;
   },
 
   actions:{ R:'reportPolice', A:'reportICO', G:'internal' },
@@ -808,6 +1018,13 @@ MODULES.legalCompliance = {
       {q:'An employee accesses a colleague\'s private email account without permission. Under which legislation does this primarily fall?',options:['Data Protection Act 1998 — processing the colleague\'s personal data without consent','Section 1 of the Computer Misuse Act 1990 — unauthorised access to computer material','Copyright Designs and Patents Act 1988 — the email content is literary work'],correct:1},
       {q:'Which organisation would a company notify following a significant accidental personal data breach affecting customers?',options:['The police, under the Computer Misuse Act 1990','The Information Commissioner\'s Office (ICO), under the Data Protection Act 1998','The Home Office, under the Regulation of Investigatory Powers Act 2000'],correct:1},
       {q:'Section 2 of the CMA 1990 differs from Section 1 in that it requires:',options:['That the unauthorised access caused financial damage exceeding £1,000','That the defendant intended to commit or facilitate a further criminal offence','That the defendant was acting as part of an organised criminal group'],correct:1},
+    
+      {q:'Under GDPR (which superseded DPA 1998 in 2018), the maximum fine for a serious data breach is:',options:['£500,000 — the maximum under DPA 1998','€20 million or 4% of global annual turnover, whichever is higher','€5 million or 2% of UK turnover, whichever is lower'],correct:1},
+      {q:'What is the maximum prison sentence for a Section 3 CMA offence (unauthorised acts with intent to impair)?',options:['2 years — the same as Section 1','5 years — reflecting the additional element of further criminal intent','10 years — reflecting the severity of malware deployment and system impairment'],correct:2},
+      {q:'A company discovers its data breach 3 days after it occurred. Under DPA 1998, when should it notify the ICO?',options:['Within 24 hours of the breach occurring','As soon as reasonably practicable after becoming aware — the 72-hour guideline under GDPR is more stringent','Within 28 days — the standard regulatory reporting timeline'],correct:1},
+      {q:'Which legislation specifically makes it illegal to intercept email communications in transit without lawful authority?',options:['Computer Misuse Act 1990 — covers all unauthorised access to computer material','Regulation of Investigatory Powers Act 2000 — specifically criminalises the interception of communications in transit','Data Protection Act 1998 — covers the unlawful processing of personal communication data'],correct:1},
+      {q:'An employee copies proprietary software from their employer\'s system to a personal USB drive without permission. Which legislation is most directly applicable?',options:['RIPA 2000 — intercepting communications on the company network','DPA 1998 — the software may contain personal data','CMA 1990 Section 1 (unauthorised access to computer material) and potentially CDPA 1988 (copyright in software as literary work)'],correct:2},
+      {q:'What is the key legal distinction between CMA Section 1 and Section 2?',options:['Section 1 applies to external attackers; Section 2 applies to employees','Section 1 requires only that access was unauthorised; Section 2 additionally requires intent to commit or facilitate a further criminal offence','Section 1 covers computer access; Section 2 covers interception of communications'],correct:1},
     ]
   }
 };
@@ -915,13 +1132,38 @@ MODULES.socialEngineering = {
   emailSender: ()=>pick(['awareness@secops.internal','security-alerts@company.net','hr-security@company.net','soc@cyberdefence.net']),
   emailSubject: ()=>pick(['Staff Reports: Suspicious Communications Require Triage','Security Awareness Alert: Potential Social Engineering Attempts','Reported Incidents: Human-Factor Attack Triage Required','SOC Alert: Suspicious Contact Attempts — Analyst Review Needed']),
   emailBody(){
-    return pick([
-      `Analyst,\n\nSeveral staff members have reported suspicious communications over the past 24 hours. Some may be social engineering attempts; others may be legitimate contacts that triggered unnecessary concern.\n\nLoad the Social Engineering Alert Triage tool. For each report, classify the communication and determine the correct response.\n\nRemember: social engineering attacks exploit psychology, not technology. The key indicators are urgency, authority, secrecy and unusual requests.\n\nSecurity Awareness Team`,
-      `Hi,\n\nFollowing last month's simulated phishing exercise, staff are now actively reporting suspicious contacts. We need to triage these reports — some are genuine attacks, some are borderline, and some are legitimate business communications wrongly flagged.\n\nUse the Social Engineering Alert Triage tool. Focus on: who is making the request, what they're asking for, and whether the channel and process are appropriate.\n\nSOC Team`,
-      `Analyst,\n\nWe've had a cluster of unusual contact attempts in the last 48 hours — possible coordinated social engineering campaign. Please triage each report. The goal is to distinguish genuine attacks from false positives without creating unnecessary operational disruption.\n\nKey question for each: does this request follow the right process through the right channel, or does it bypass normal procedures?\n\nHuman Factor Security`
-    ]);
+    return 'Analyst,\n\nTechCorp\'s help desk logged several unusual contact attempts '
+      +'in the days before the breach. We now believe the attacker used social engineering '
+      +'to gather intelligence and access credentials before the technical phase of the attack began.\n\n'
+      +'Identifying which contacts were part of the attack chain is critical — '
+      +'it will determine whether staff disciplinary action is needed, '
+      +'and whether we need to notify specific employees about potential credential compromise.\n\n'
+      +'Load the Social Engineering Alert Triage tool.\n\n'
+      +'Threat Intelligence — TechCorp IR';
   },
-
+  diagnosticSummary:'Social engineering exploits human psychology. Attack types: phishing (deceptive email), spear-phishing (targeted personalised), vishing (phone), smishing (SMS), pretexting (fabricated scenario), baiting (physical or digital lure), tailgating (physical access), BEC (executive impersonation). Psychological levers: urgency, authority, scarcity, social proof. Universal defence: verify through a separate pre-established channel.',
+  diagnosticQuestions:[
+    {q:'What is social engineering in security',opts:['Designing systems easy for humans to use','Manipulating people into revealing information or taking actions that compromise security','Hacking into social media platforms'],ok:1,hint:'Social engineering targets humans rather than systems. One deceived employee can defeat perfect technical controls entirely.'},
+    {q:'What is phishing',opts:['A technique for testing network security','An attack using deceptive emails or websites to trick users into revealing credentials or installing malware','Software that monitors employee internet use'],ok:1,hint:'Phishing is the most common cyberattack vector — cheap, scalable and exploits human trust rather than technical vulnerabilities.'},
+    {q:'What is two-factor authentication',opts:['Requiring two administrators to approve each login','Using two separate verification methods to confirm identity','Logging in with two passwords'],ok:1,hint:'2FA means stolen passwords alone are useless. The attacker also needs the second factor which is typically a physical device.'},
+    {q:'What is vishing',opts:['A visual security inspection','A phishing attack conducted over the phone','Malware that records video from a device camera'],ok:1,hint:'The 2020 Twitter hack was accomplished primarily through vishing. Attackers called employees impersonating IT support.'},
+    {q:'What makes spear-phishing more effective than generic phishing',opts:['It uses physical mail instead of email','It is personalised with researched details such as real names job titles and project references making it appear highly credible','It only targets government organisations'],ok:1,hint:'Generic phishing sends millions of identical emails. Spear-phishing sends one carefully crafted message to one carefully researched target.'},
+    {q:'Why is urgency effective as a manipulation technique',opts:['Urgent requests receive legal priority','Urgency creates time pressure that overrides careful critical thinking and the instinct to verify','IT systems automatically prioritise urgent requests'],ok:1,hint:'Urgency is the attacker primary weapon — specifically designed to prevent the victim from pausing to check or verify.'},
+    {q:'What is pretexting',opts:['A backup plan when the main attack fails','A fabricated plausible scenario used to establish trust before making a request','A scenario used in security awareness training'],ok:1,hint:'Pretexting is an invented backstory to give the attacker credibility before requesting access or information.'},
+    {q:'What is baiting in social engineering',opts:['Enticing employees with bonuses to report incidents','Using physical media or digital lures to exploit human curiosity such as a USB drive labelled Payroll','Sending fake job offers to extract information'],ok:1,hint:'Baiting exploits curiosity. Studies show most found USB drives are plugged in within minutes.'},
+    {q:'What is tailgating in physical security',opts:['Following employees on social media','Gaining unauthorised physical access by following an authorised person through a secured door','Monitoring vehicles near a secure facility'],ok:1,hint:'Tailgating exploits politeness — people hold doors open. Turnstiles and a culture of challenging unfamiliar faces are the defences.'},
+    {q:'What is BEC (Business Email Compromise)',opts:['A bug in business email software','Fraud where attackers impersonate executives to pressure employees into making unauthorised transfers','Blocking business email to extort payment'],ok:1,hint:'BEC is responsible for billions in annual losses. Finance teams are the primary target. Dual authorisation and verbal confirmation are the fix.'},
+    {q:'Why should you never share a password with IT support',opts:['IT staff are not trusted with sensitive data','Legitimate IT staff never need your password because they have administrative access through other means','Passwords are encrypted and IT cannot read them'],ok:1,hint:'Any request for your password is either unnecessary if from legitimate IT or malicious if from an attacker.'},
+    {q:'What is a lookalike domain',opts:['A domain that resolves to two different IP addresses','A fraudulent domain designed to appear similar to a legitimate one — for example paypa1.com instead of paypal.com','A domain registered in another country'],ok:1,hint:'Lookalike domains are used in phishing and BEC. Differences are subtle: replacing l with 1, adding a hyphen, or swapping the TLD.'},
+    {q:'What is smishing',opts:['A social media phishing attack','A phishing attack delivered via SMS text messages','A physical access attack using a friendly approach'],ok:1,hint:'Smishing uses SMS because people trust text messages more than email. Common: fake delivery notifications and bank fraud alerts.'},
+    {q:'What is social proof as a manipulation technique',opts:['Evidence gathered from social media about a target','Implying that others have already complied to encourage the target to do the same','Verifying identity through social media profiles'],ok:1,hint:'Everyone else has already done this. This exploits the human tendency to follow what others appear to be doing.'},
+    {q:'The best defence against social engineering is',opts:['Advanced antivirus software on all endpoints','Security awareness training combined with clear verification procedures for unusual requests','Blocking all external phone calls'],ok:1,hint:'Technical controls cannot defend against human manipulation. Awareness training and a verify-before-you-comply culture are the only effective defences.'},
+    {q:'What is multi-factor authentication',opts:['Requiring multiple users to approve each action','Using two or more verification factors — something you know have or are — to confirm identity','Changing your password multiple times per month'],ok:1,hint:'MFA defeats credential theft. Even if a password is stolen the attacker also needs the second factor.'},
+    {q:'What is CEO fraud',opts:['An executive accidentally deleting critical data','Attackers impersonating executives to pressure finance staff into making unauthorised payments','A CEO committing insider trading using company systems'],ok:1,hint:'CEO fraud exploits authority bias. The fix is dual authorisation and verbal confirmation on a known number.'},
+    {q:'Why must you verify through a separate channel',opts:['Because the original channel may be monitored','Because the attacker may have compromised or be impersonating the original channel so a separate channel breaks the deception','Because it creates an audit trail'],ok:1,hint:'If an attacker is impersonating your colleague by email asking them to verify by email is useless. Call on a number from the company directory.'},
+    {q:'What does authority mean as a social engineering lever',opts:['The legal right to demand compliance','Exploiting the tendency to comply with perceived authority figures such as managers IT staff or auditors','Demonstrating technical expertise to gain trust'],ok:1,hint:'Authority is highly effective because people are conditioned to follow instructions from authority figures.'},
+    {q:'What did the 2020 Twitter hack demonstrate',opts:['That Twitter encryption was broken','That social engineering alone without any technical exploit can compromise major organisations by targeting internal staff','That two-factor authentication is ineffective'],ok:1,hint:'Attackers called Twitter employees posing as IT support, obtained VPN credentials and accessed internal tools. No technical vulnerability was exploited.'}
+  ],
   tools: {
     correct: 'Social Engineering Alert Triage',
     decoys: ['Packet Capture Analyser','Encryption Audit Tool','SQL Query Log Viewer','Firewall Rule Manager','Legal Reference Database','Endpoint Detection Log Viewer','Email Header Analyser']
@@ -935,7 +1177,7 @@ MODULES.socialEngineering = {
     realWorld: "In 2020, attackers called Twitter's internal IT support, impersonated employees, and convinced staff to hand over admin credentials. Within hours they had compromised 130 high-profile accounts including Barack Obama, Elon Musk and Apple, posting a Bitcoin scam that generated $120,000 in two hours. No malware was used. The entire attack was a phone call."
   },
 
-  generateScenario({numItems=6}={}){
+  generateScenario({numItems=6,difficulty=1}={}){
     const pool = [
       // RED — clear social engineering attacks
       {
@@ -1013,9 +1255,16 @@ MODULES.socialEngineering = {
         notes:'Legitimate: appointment pre-booked in advance, contractor verified with photo ID, escorted throughout. This is precisely the process that SE-005 (the pretexting attack) was trying to bypass. The contrast is the point — process compliance is the defence.'
       },
     ];
-    const nR=pick([1,2,2,3]);
-    const nA=pick([1,1,2]);
-    const nG=numItems-nR-nA;
+    // Adaptive difficulty — set by Analyst Pre-Brief diagnostic score
+    var nR,nA,nG;
+    if(difficulty===0){           // FOUNDATION: clear-cut cases, minimal edge cases
+      nR=pick([2,2,3]); nA=pick([0,0,1]);
+    } else if(difficulty===2){    // ADVANCED: edge cases dominate, precision required
+      nR=pick([1,1,2]); nA=pick([2,3,3]);
+    } else {                      // STANDARD: balanced mix
+      nR=pick([1,1,2,2,3]); nA=pick([0,1,1,2]);
+    }
+    nG=numItems-nR-nA;
     return _pickPool(pool,nR,nA,Math.max(1,nG));
   },
 
@@ -1024,9 +1273,13 @@ MODULES.socialEngineering = {
 
   completionText(_,sc){
     const att=sc.filter(s=>s.ragAnswer!=='G').length;
-    return `<div class="rc info"><h3>SOCIAL ENGINEERING — KEY PRINCIPLES</h3>
-    <p>${att} suspicious contact(s) identified. Social engineering bypasses every technical control by targeting the human. The universal defence: <strong>verify through a separate, pre-established channel</strong> — never through the contact method the attacker is using.</p>
-    <p style="margin-top:8px;"><strong>Key types:</strong> Phishing (email), spear-phishing (personalised), vishing (phone), smishing (SMS), pretexting (fabricated scenario), baiting (physical lure), BEC (CEO fraud).</p></div>`;
+    return `<div class="rc info">
+      <div style="font-family:'Orbitron',monospace;font-size:11px;color:rgba(0,255,65,.5);letter-spacing:.1em;margin-bottom:8px;">📁 TECHCORP IR — SOCIAL ENGINEERING ANALYSIS</div>
+      <p style="margin-bottom:8px;"><strong>${att} suspicious contact(s)</strong> identified in the pre-breach window. ${att>0?'This confirms the attacker ran a social engineering phase before the technical attack — gathering credentials, access, and internal knowledge that made the later technical exploitation much easier.':'The suspicious contacts appear to be unrelated to the breach, but demonstrate the kind of targeting TechCorp faces.'}</p>
+      <hr style="border-color:rgba(0,255,65,.15);margin:10px 0;">
+      <div style="font-family:'Orbitron',monospace;font-size:10px;color:rgba(0,255,65,.5);letter-spacing:.1em;margin-bottom:6px;">📝 EXAM FOCUS: SOCIAL ENGINEERING & NETWORK THREATS</div>
+      <p style="font-size:12px;line-height:1.6;">Examiners expect you to: <strong>name and distinguish attack types</strong> (phishing/spear-phishing/vishing/smishing/pretexting/baiting/BEC), <strong>identify psychological techniques</strong> (urgency, authority, scarcity, reciprocity), <strong>explain defences</strong> (security awareness training, verification procedures). A common 2-mark question: "Give two features of a spear-phishing email that make it more effective than generic phishing." Answer: personalised to target (1 mark) using researched details such as real colleague names or project references (1 mark).</p>
+    </div>`;
   },
 
   actions:{ R:'block', A:'verify', G:'allow' },
@@ -1053,6 +1306,13 @@ MODULES.socialEngineering = {
       {q:'The most effective technical and procedural defence against social engineering is:',options:['Installing endpoint antivirus software on all workstations','Blocking all inbound email attachments at the mail gateway','Security awareness training combined with verification procedures — all unusual requests confirmed through a separate, known channel'],correct:2},
       {q:'Vishing uses which attack channel?',options:['Fraudulent emails designed to look like legitimate communications','Voice calls — phone-based social engineering using a plausible pretext','SMS messages containing malicious links or fraudulent instructions'],correct:1},
       {q:'An attacker who follows an authorised employee through a secure door without using their own credentials is performing:',options:['Pretexting — using a fabricated scenario to justify their presence','Tailgating — exploiting courtesy to gain unauthorised physical access','Vishing — the door entry system uses a PIN (voice interaction)'],correct:1},
+    
+      {q:'What is smishing?',options:['A form of phishing that uses social media messages to deliver malicious links','A phishing attack delivered via SMS text messages','A physical tailgating attack where the attacker "smiles" their way past security'],correct:1},
+      {q:'Why does spear-phishing succeed more often than generic phishing?',options:['Spear-phishing emails always contain malware attachments; generic phishing relies only on links','Spear-phishing is personalised using researched details (real names, project references, job titles), making it appear more credible and reducing the victim\'s suspicion','Spear-phishing exploits software vulnerabilities; generic phishing relies on social manipulation alone'],correct:1},
+      {q:'What psychological principle does "Your account will be permanently deleted in 24 hours" primarily exploit?',options:['Reciprocity — the victim feels they owe the company compliance','Urgency and scarcity — creating time pressure that overrides careful, critical thinking','Social proof — implying most users have already verified their accounts'],correct:1},
+      {q:'An attacker calls a receptionist pretending to be from the fire safety inspection company and requests immediate server room access. What type of attack is this?',options:['Vishing — the attack uses a voice call to obtain information or access','Pretexting — a fabricated but plausible scenario designed to gain trust and physical access','Baiting — using the promise of something desirable to lure the victim'],correct:1},
+      {q:'What is tailgating in physical security?',options:['Following a legitimate employee through a secure door without using your own credentials','Reading over someone\'s shoulder to obtain their password or PIN','Installing tracking software on a victim\'s device to monitor their location'],correct:0},
+      {q:'Which of the following represents the most complete defence against social engineering?',options:['Installing next-generation antivirus software on all employee workstations','Blocking all external phone calls to prevent vishing','Security awareness training combined with clear verification procedures — all unusual requests confirmed through a separate, pre-established channel'],correct:2},
     ]
   }
 };
@@ -1070,13 +1330,38 @@ MODULES.malwareAnalysis = {
   emailSender: ()=>pick(['edr@secops.internal','endpoint@infrasec.net','soc-alerts@company.net','threat-intel@cyberdefence.net']),
   emailSubject: ()=>pick(['EDR Alert: Anomalous Process Behaviour Detected','Endpoint Security: Suspicious Activity Requires Triage','SOC Alert: Potential Malware Indicators on Workstations','Threat Detection: Endpoint Behaviour Review Required']),
   emailBody(){
-    return pick([
-      `Analyst,\n\nOur Endpoint Detection and Response system has flagged several processes exhibiting unusual behaviour across the estate. Some are confirmed malicious indicators; others may be legitimate system or application activity.\n\nLoad the Endpoint Detection Log Viewer and triage each entry. Focus on: the executable path, what the process is doing, and whether the network connections are expected for that process.\n\nSOC Team`,
-      `Hi,\n\nThe EDR platform has raised alerts following scheduled threat hunts across endpoints. We need a second opinion on several flagged processes — some look bad, some are edge cases.\n\nUse the Endpoint Detection Log Viewer. Key question for each: is this process behaviour consistent with its claimed identity and legitimate system operation?\n\nEndpoint Security`,
-      `Analyst,\n\nWe received a threat intelligence feed indicating that a malware campaign is targeting organisations in our sector. Running a hunt against that IoC profile has surfaced several process matches — some genuine, some false positives.\n\nTriage each item in the Endpoint Detection Log Viewer. Pay attention to execution paths — legitimate Windows system processes run from known, protected directories.\n\nThreat Intelligence`
-    ]);
+    return 'Analyst,\n\nPost-breach, TechCorp\'s EDR is flagging unusual process behaviour '
+      +'across multiple workstations. The attacker may still have persistent access.\n\n'
+      +'TIME-CRITICAL: if ransomware deploys while we\'re investigating, '
+      +'TechCorp\'s payment processing stops entirely — 500,000 customers affected, '
+      +'potential losses in the tens of thousands per hour.\n\n'
+      +'Any confirmed malware means immediate host isolation. '
+      +'Load the Endpoint Detection Log Viewer and work fast.\n\n'
+      +'Incident Response Lead — TechCorp IR';
   },
-
+  diagnosticSummary:'Malware types: virus attaches to files and needs user action to spread. Worm self-replicates across networks without user action. Trojan is disguised as legitimate software. Ransomware encrypts files and demands payment. Keylogger captures keystrokes. Spyware exfiltrates data silently. Rootkit hides other malware. Indicators of Compromise include suspicious process paths, unexpected network connections and abnormal CPU or disk activity.',
+  diagnosticQuestions:[
+    {q:'What is malware',opts:['Poorly written software that causes crashes','Software designed to disrupt damage or gain unauthorised access to a computer system','A tool used by security professionals to test systems'],ok:1,hint:'Malware covers viruses, worms, trojans, ransomware, spyware, keyloggers, rootkits and botnets.'},
+    {q:'What distinguishes a worm from a virus',opts:['A worm encrypts files a virus does not','A worm self-replicates across a network without needing a host file or user action while a virus requires user execution to spread','A worm only affects email servers'],ok:1,hint:'WannaCry spread so rapidly because it used worm functionality via EternalBlue. No user had to click anything — it propagated automatically.'},
+    {q:'What is a trojan horse in computing',opts:['An ancient technique for bypassing physical security','Malware disguised as legitimate software to trick users into installing it','A virus targeting only legacy systems'],ok:1,hint:'Trojans exploit trust. They rely on the user installing them willingly believing them to be something useful.'},
+    {q:'What is ransomware',opts:['Software that locks a screen until a puzzle is solved','Malware that encrypts files and demands payment for the decryption key','Adware that hijacks browser searches'],ok:1,hint:'Ransomware can encrypt every file on every connected system. WannaCry hit the NHS in 2017 cancelling thousands of appointments.'},
+    {q:'What is a keylogger',opts:['Software that monitors login attempts','Malware that records keystrokes to capture passwords and sensitive data','Hardware that tests keyboard functionality'],ok:1,hint:'Keyloggers capture everything typed including passwords and credit card numbers. The data is typically sent to the attacker via a C2 channel.'},
+    {q:'What does an EDR system do',opts:['Encrypts data on endpoint devices','Monitors endpoint behaviour for suspicious activity and enables rapid investigation and response','Manages hardware inventory on endpoints'],ok:1,hint:'EDR provides complete visibility into endpoint activity — processes, network connections, file changes. It lets analysts replay exactly what malware did.'},
+    {q:'What is a rootkit',opts:['Software that grants root-level admin access','Malware designed to hide the presence of other malware by modifying the operating system','Software that scans for root certificates'],ok:1,hint:'Rootkits subvert the OS itself. Standard tools like Task Manager may show a clean system while malware runs invisibly beneath it.'},
+    {q:'What is a botnet',opts:['A network of security cameras','A network of compromised computers controlled remotely to perform coordinated attacks','A test environment for security researchers'],ok:1,hint:'Botnets are used for DDoS attacks, spam, credential stuffing and cryptomining. Infected machines appear normal to their owners.'},
+    {q:'What is a C2 (command and control) server',opts:['The primary server managing company databases','A server attackers use to send instructions to and receive data from compromised machines','A failover server that activates if the primary fails'],ok:1,hint:'C2 channels allow attackers to control malware remotely. Periodic check-in connections at fixed intervals are a key indicator.'},
+    {q:'What is persistence in malware terms',opts:['Malware that is difficult to detect','The ability of malware to survive a reboot by modifying startup mechanisms such as registry keys and scheduled tasks','The speed at which malware replicates'],ok:1,hint:'Persistent malware ensures continued access after a reboot. Thorough incident response must find and remove all persistence mechanisms.'},
+    {q:'What is spyware',opts:['Software used by security teams to monitor networks','Malware that covertly collects information and sends it to an attacker','Government surveillance software installed with legal authority'],ok:1,hint:'Spyware operates silently exfiltrating data over time. Victims may not notice for months.'},
+    {q:'What is lateral movement in an intrusion',opts:['Spreading malware to other countries','Moving from the initially compromised machine to other systems within the same network to reach higher-value targets','Redirecting traffic to conceal the attack source'],ok:1,hint:'Lateral movement is how attackers go from a workstation foothold to a domain controller. It often uses legitimate admin tools.'},
+    {q:'Why is a process in AppData Temp suspicious',opts:['AppData is a protected folder users cannot access','Legitimate Windows system processes run from System32 not user-writable directories like AppData Temp','Temp folders are deleted automatically making processes there unstable'],ok:1,hint:'Malware uses writable locations because it does not need admin rights there. System processes have no reason to run from user-writable directories.'},
+    {q:'What is a zero-day vulnerability',opts:['A vulnerability known for less than 24 hours','A vulnerability unknown to the software vendor with no available patch','A vulnerability only affecting newly installed software'],ok:1,hint:'Zero-day means the vendor has had zero days to fix it. Zero-days are extremely valuable to attackers since they cannot be patched until discovered.'},
+    {q:'What is cryptojacking',opts:['Stealing and ransoming encrypted files','Using a victim computer without consent to mine cryptocurrency causing high CPU usage and elevated electricity costs','Intercepting and decrypting HTTPS traffic'],ok:1,hint:'Cryptojacking is low-profile but costly. Victims notice sluggish performance and higher electricity bills.'},
+    {q:'What is an Indicator of Compromise',opts:['A certificate proving a system is secure','Forensic evidence suggesting a system has been breached such as a suspicious process unexpected network connection or new scheduled task','A risk score assigned to a known vulnerability'],ok:1,hint:'IoCs are what analysts hunt for: unusual process names, unexpected outbound connections, modified system files and accounts the IT team did not create.'},
+    {q:'What does isolating a compromised host mean',opts:['Physically removing the hard drive','Disconnecting the device from the network to prevent further spread while preserving forensic evidence','Immediately deleting all files on the machine'],ok:1,hint:'Isolation stops spread and cuts the C2 channel while preserving evidence. It is typically the first response to confirmed malware.'},
+    {q:'What is a backdoor',opts:['An undocumented developer access mechanism','Hidden persistent remote access installed by malware giving the attacker ongoing entry independent of the initial intrusion','A secondary administrator account'],ok:1,hint:'Even after cleaning a system an undiscovered backdoor gives the attacker a way back in. All persistence mechanisms must be found and removed.'},
+    {q:'What is an antivirus signature',opts:['A certificate proving antivirus is genuine','A pattern or fingerprint used to identify a specific piece of known malware','An approval stamp from a security audit'],ok:1,hint:'Signature-based detection is fast for known malware but fails against new or modified threats. Behavioural detection fills this gap.'},
+    {q:'How does a virus differ from a worm in spreading',opts:['Viruses spread via network worms spread via email','A virus requires a host file and user action to spread while a worm is self-contained and self-propagating requiring no user interaction','A virus is always destructive a worm is always passive'],ok:1,hint:'This distinction is a common exam question. Viruses need user execution. Worms exploit network services and spread automatically.'}
+  ],
   tools: {
     correct: 'Endpoint Detection Log Viewer',
     decoys: ['Packet Capture Analyser','Encryption Audit Tool','SQL Query Log Viewer','Firewall Rule Manager','Social Engineering Alert Triage','Legal Reference Database','Network Traffic Monitor']
@@ -1090,7 +1375,7 @@ MODULES.malwareAnalysis = {
     realWorld: 'In May 2017 WannaCry ransomware encrypted computers in 150 countries within hours, including approximately one-third of NHS trusts in England. It exploited an unpatched Windows SMB vulnerability (EternalBlue), self-replicated as a worm across networks, then encrypted files and demanded Bitcoin. The NHS cancellations cost an estimated £92 million. The kill switch — a hardcoded domain that WannaCry checked before encrypting — was accidentally discovered by a security researcher who registered it for £8.'
   },
 
-  generateScenario({numItems=6}={}){
+  generateScenario({numItems=6,difficulty=1}={}){
     const pool = [
       // RED — confirmed malware behaviour
       {
@@ -1168,9 +1453,16 @@ MODULES.malwareAnalysis = {
         notes:'Legitimate: this is the Veeam backup agent performing a scheduled nightly backup. High file read rates during the backup window are expected. The destination is an internal NAS appliance, not an external IP. The path is the correct installed location. Allow.'
       },
     ];
-    const nR=pick([1,2,2,3]);
-    const nA=pick([1,1,2]);
-    const nG=numItems-nR-nA;
+    // Adaptive difficulty — set by Analyst Pre-Brief diagnostic score
+    var nR,nA,nG;
+    if(difficulty===0){           // FOUNDATION: clear-cut cases, minimal edge cases
+      nR=pick([2,2,3]); nA=pick([0,0,1]);
+    } else if(difficulty===2){    // ADVANCED: edge cases dominate, precision required
+      nR=pick([1,1,2]); nA=pick([2,3,3]);
+    } else {                      // STANDARD: balanced mix
+      nR=pick([1,1,2,2,3]); nA=pick([0,1,1,2]);
+    }
+    nG=numItems-nR-nA;
     return _pickPool(pool,nR,nA,Math.max(1,nG));
   },
 
@@ -1178,10 +1470,14 @@ MODULES.malwareAnalysis = {
   reportHint: 'Active malware on endpoints is a live security incident — which team handles containment and forensic response?',
 
   completionText(_,sc){
-    const att=sc.filter(s=>s.ragAnswer!=='G').length;
-    return `<div class="rc info"><h3>MALWARE ANALYSIS — KEY PRINCIPLES</h3>
-    <p>${att} suspicious process(es) identified. Key rule: legitimate Windows system processes run from C:\\Windows\\System32. A known process name running from AppData\\Temp is name spoofing. High file write rate + new extensions = ransomware. Periodic outbound connections to unknown IP = C2 channel.</p>
-    <p style="margin-top:8px;"><strong>Key types:</strong> Virus (attaches to files, needs user action), Worm (self-replicates, no user action), Trojan (appears legitimate), Ransomware (encrypts for payment), Keylogger (captures input), Spyware (broad data capture), Rootkit (hides in OS).</p></div>`;
+    const att=sc.filter(s=>s.ragAnswer==='R').length;
+    return `<div class="rc info">
+      <div style="font-family:'Orbitron',monospace;font-size:11px;color:rgba(0,255,65,.5);letter-spacing:.1em;margin-bottom:8px;">📁 TECHCORP IR — ENDPOINT FORENSICS</div>
+      <p style="margin-bottom:8px;"><strong>${att} confirmed malware instance(s)</strong> on TechCorp endpoints. ${att>0?'The attacker achieved persistent access — the keylogger confirms credentials were captured, and the trojan maintained a live C2 channel. These hosts must be isolated and imaged immediately before remediation.':'No confirmed malware in this endpoint sample — but the suspicious behaviours warrant further investigation.'}</p>
+      <hr style="border-color:rgba(0,255,65,.15);margin:10px 0;">
+      <div style="font-family:'Orbitron',monospace;font-size:10px;color:rgba(0,255,65,.5);letter-spacing:.1em;margin-bottom:6px;">📝 EXAM FOCUS: MALWARE & NETWORK THREATS</div>
+      <p style="font-size:12px;line-height:1.6;">Examiners test: <strong>malware type definitions</strong> (virus needs user action to spread; worm self-replicates; trojan appears legitimate; ransomware encrypts for payment; keylogger captures input; rootkit hides other malware). <strong>Classic 4-marker</strong>: "Describe how ransomware works and explain one way organisations can protect against it." Top answer: encrypts files making them inaccessible (2) → demands payment for decryption key (1) → defence: offline backups that ransomware cannot reach (1).</p>
+    </div>`;
   },
 
   actions:{ R:'isolate', A:'investigate', G:'allow' },
@@ -1208,6 +1504,13 @@ MODULES.malwareAnalysis = {
       {q:'A botnet client on an infected machine would most characteristically show which behaviour in EDR logs?',options:['Extremely high CPU usage continuously, indicating cryptomining','Periodic, scheduled outbound connections to an external IP address on a fixed interval — awaiting instructions from the command and control server','Rapid deletion of system log files to cover its tracks'],correct:1},
       {q:'Spyware differs from a keylogger in that it:',options:['Only targets smartphones and tablet devices, not desktop systems','Captures a broader range of data — screenshots, browser history, saved credentials and clipboard contents — not just keyboard input','Must be installed manually by an attacker with physical access to the device'],correct:1},
       {q:'The WannaCry ransomware spread so rapidly because it combined ransomware behaviour with which other malware capability?',options:['Rootkit functionality — it hid itself from antivirus tools on each infected machine','Worm functionality — it self-replicated across networks by exploiting an SMB vulnerability without any user interaction','Trojan functionality — it disguised itself as a Windows system update'],correct:1},
+    
+      {q:'How does a rootkit differ from other malware types?',options:['A rootkit encrypts files and demands payment for decryption — the key difference from ransomware','A rootkit modifies the operating system to hide the presence of other malware — making standard detection tools unreliable on an infected host','A rootkit spreads automatically across a network; other malware types require user interaction'],correct:1},
+      {q:'What is cryptojacking?',options:['Stealing encrypted files and ransoming the decryption key','Using a victim\'s computer resources without their knowledge to mine cryptocurrency — causing high CPU usage and electricity costs','Intercepting and decrypting HTTPS traffic by compromising a certificate authority'],correct:1},
+      {q:'What is lateral movement in the context of a network intrusion?',options:['The attacker redirecting traffic from one server to another to avoid detection','The attacker moving from the initially compromised machine to other systems on the same network, expanding their access','The attacker using a VPN to make their traffic appear to come from a different geographic location'],correct:1},
+      {q:'A backdoor differs from a trojan horse in that:',options:['A backdoor is always installed by the attacker manually; a trojan is always distributed via email','A backdoor specifically provides persistent remote access to a system; a trojan is a broader term for malware disguised as legitimate software (which may include a backdoor)','A backdoor only targets Windows systems; trojans work across all operating systems'],correct:1},
+      {q:'What is an Indicator of Compromise (IoC)?',options:['A formal legal notice that a system has been certified as secure','Forensic evidence suggesting a system has been breached — e.g. a suspicious process, unexpected network connection, or new registry key','A risk score assigned to a vulnerability based on its potential impact and exploitability'],correct:1},
+      {q:'The WannaCry ransomware spread so rapidly in 2017 because it combined which two capabilities?',options:['Keylogging and screen capture — allowing it to steal credentials from each infected machine before spreading','Worm functionality (self-replication via an SMB vulnerability) and ransomware (encrypting files) — no user action required to propagate','Trojan installation and rootkit concealment — making it invisible to standard antivirus tools'],correct:1},
     ]
   }
 };
